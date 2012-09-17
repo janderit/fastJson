@@ -1,0 +1,127 @@
+require 'albacore'
+gem 'rubyzip'
+require 'zip/zip'
+require 'zip/zipfilesystem'
+require 'rake/clean'
+require 'erb'
+
+# TODO: improve multi-project http://www.stuartellis.eu/articles/rake/#scaling
+
+PRODUCT_CODE = "fastJson-janderit"
+PRODUCT_NAME = "fastJson JSON serialization library fork"
+COMPANY_NAME = "Jander.IT"
+COPYRIGHT = "(c) 2012 Jander.IT"
+WORKSPACE = ENV["WORKSPACE"] || "."
+BUILD_NUMBER = ENV["BUILD_NUMBER"] || "0"
+BRANCH = ENV["BRANCH"] || "development"
+DESCRIPTION = "This is a fork of Mehdi Golam's fastJson library as found on code project"
+NUGETREPOTARGET = ENV["NUGETREPOTARGET"] || "nul:"
+
+TARGET = :Debug
+
+NOTES = BRANCH
+
+NUNIT_EXE="C:/Program Files (x86)/NUnit 2.6/bin/nunit-console" if File.exists?("C:/Program Files (x86)/NUnit 2.6/bin/nunit-console.exe")
+NUNIT_EXE="C:/Program Files (x86)/NUnit 2.6.1/bin/nunit-console" if File.exists?("C:/Program Files (x86)/NUnit 2.6.1/bin/nunit-console.exe")
+NUNIT_EXE="C:/Programme/NUnit 2.6.1/bin/nunit-console" if File.exists?("C:/Programme/NUnit 2.6.1/bin/nunit-console.exe")
+NUNIT_ARGS=" /labels"
+
+DOTNET_FRAMEWORK_VERSION="v4.0.30319"
+
+projects = (Dir.entries(WORKSPACE)-[".",".."]).select{|x|File.directory?(File.join(WORKSPACE,x))}.select{|x|File.exists?(File.join(WORKSPACE,x,"Properties","AssemblyInfo.cs"))}
+
+CLEAN.include('*.mm.dll', '*.mm.exe*')
+CLOBBER.include('*.pdb', '*.xml')
+
+
+
+task :default => ['fastJson-janderit.nupkg']
+
+desc "fastJson library"
+file 'fastJson.dll' => [:build_solution, :test_common]
+
+task :loadtargetversion do
+	file = File.new("version.txt", "r")
+	SHORTVERSIONSTRING=file.gets
+	file.close
+	VERSIONSTRING=SHORTVERSIONSTRING+"."+BUILD_NUMBER
+	FULLVERSIONSTRING=SHORTVERSIONSTRING if BRANCH == "stable"
+	FULLVERSIONSTRING=SHORTVERSIONSTRING+"-"+BRANCH+"-"+BUILD_NUMBER unless BRANCH == "stable"
+	
+	NOTES = open("releasenotes-"+SHORTVERSIONSTRING+".txt" , &:read) if File.exists? "releasenotes-"+SHORTVERSIONSTRING+".txt"
+
+	puts VERSIONSTRING
+end
+
+
+
+
+
+desc "Build all"
+msbuild :build_solution => [:fastjson_info] do |msb|
+  msb.properties :configuration => TARGET
+  msb.targets :Clean, :Build
+  msb.solution = "consoletest.sln"
+end
+
+
+def commonInfo(asm)
+  asm.title = PRODUCT_NAME
+  asm.description = DESCRIPTION
+  asm.product_name = PRODUCT_NAME
+  asm.company_name = COMPANY_NAME
+  asm.copyright = COPYRIGHT
+  asm.version = VERSIONSTRING
+  asm.file_version = VERSIONSTRING
+  asm.custom_attributes :ComVisible => false
+  asm
+end
+
+
+assemblyinfo :fastjson_info => :loadtargetversion do |asm|  
+  targetdir = "fastJSON/Properties";
+
+  asm=commonInfo(asm)
+
+  Dir.mkdir(targetdir) unless File.directory?(targetdir)
+  asm.output_file = targetdir+"/AssemblyInfo.cs"
+end
+
+
+desc "Update NuSpec"
+task :update_nuspec => :loadtargetversion do
+	nuspectemplate=open(PRODUCT_CODE+".sln.nuspec.erb", &:read)
+	render=ERB.new(nuspectemplate).result()
+	File.open(PRODUCT_CODE+".nuspec", "w+") do |f|
+	  f.write(render)
+	  f.write("\n")
+	  f.close()
+	end
+end
+
+task PRODUCT_CODE+'.nupkg' => ['fastJson.dll', :update_nuspec] do 
+	puts "Generating NUGET Package..."
+	cmd = ".nuget/nuget.exe pack "+PRODUCT_CODE+".nuspec -Verbose"
+	puts ": "+cmd
+	system(cmd)
+end
+
+task :publish_nupkg => [PRODUCT_CODE+'.nupkg'] do
+	sources = FileList.new(PRODUCT_CODE+'.*.nupkg')
+
+	sources.each do |f|
+		puts "copying "+f+" to "+ NUGETREPOTARGET
+		cp f,NUGETREPOTARGET, :verbose => true
+	end
+end
+
+
+desc "Test fastJson"
+nunit :test_common => :build_solution do |nunit|
+	nunit.command = NUNIT_EXE
+	nunit.options '/framework '+DOTNET_FRAMEWORK_VERSION+NUNIT_ARGS
+	nunit.assemblies "#{WORKSPACE}/UnitTests/Bin/#{TARGET}/UnitTests.dll"
+end
+
+
+

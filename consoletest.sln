@@ -7,7 +7,23 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "fastJSON", "fastJSON\fastJS
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "UnitTests\UnitTests.csproj", "{F4BFF0D2-45F6-413B-B1E7-BC4A0D6596FC}"
 EndProject
-
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C33B35EE-89F8-402A-9E6A-4663FD43152E}"
+	ProjectSection(SolutionItems) = preProject
+		changes.txt = changes.txt
+		fastJson-phj.sln.nuspec.erb = fastJson-phj.sln.nuspec.erb
+		LICENSE.html = LICENSE.html
+		rakefile. = rakefile.
+		README.md = README.md
+		version.txt = version.txt
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{8F129F0B-88C4-4878-875C-BE82A8E4B787}"
+	ProjectSection(SolutionItems) = preProject
+		.nuget\NuGet.Config = .nuget\NuGet.Config
+		.nuget\NuGet.exe = .nuget\NuGet.exe
+		.nuget\NuGet.targets = .nuget\NuGet.targets
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
