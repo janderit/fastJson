@@ -161,7 +161,7 @@ namespace fastJSON
             _output.Append(":");
             _output.Append(dt.Second.ToString("00", NumberFormatInfo.InvariantInfo));
 
-            if (_params.UseUTCDateTime)
+            if (_params.UseUTCDateTime || dt.Kind==DateTimeKind.Utc)
                 _output.Append("Z");
 
             _output.Append("\"");

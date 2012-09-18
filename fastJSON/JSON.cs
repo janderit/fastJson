@@ -604,7 +604,7 @@ namespace fastJSON
             if (_params.UseUTCDateTime == false && utc == false)
                 return new DateTime(year, month, day, hour, min, sec);
             else
-                return new DateTime(year, month, day, hour, min, sec, DateTimeKind.Utc).ToLocalTime();
+                return new DateTime(year, month, day, hour, min, sec, DateTimeKind.Utc);
         }
 
         private object CreateArray(List<object> data, Type pt, Type bt, Dictionary<string, object> globalTypes)
