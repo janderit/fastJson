@@ -241,6 +241,7 @@ namespace fastJSON
             public bool isString;
             public bool isBool;
             public bool isClass;
+            public bool isInterface;
             public Reflection.GenericGetter getter;
             public bool isStringDictionary;
             public string Name;
@@ -317,6 +318,7 @@ namespace fastJSON
             d.isString = t == typeof(string);
             d.isBool = t == typeof(bool) || t == typeof(bool?);
             d.isClass = t.IsClass;
+            d.isInterface= t.IsInterface;
 
             if (d.isDictionary && d.GenericTypes.Length > 0 && d.GenericTypes[0] == typeof(string))
                 d.isStringDictionary = true;
@@ -508,7 +510,7 @@ namespace fastJSON
                         else if (pi.isDateTime)
                             oset = CreateDateTime((string) v);
 
-                        else if (pi.isClass && v is Dictionary<string, object>)
+                        else if ((pi.isClass || pi.isInterface) && v is Dictionary<string, object>)
                             oset = ParseDictionary((Dictionary<string, object>) v, globaltypes, pi.pt, pi.getter(o));
 
                         else if (pi.isValueType)
