@@ -83,11 +83,19 @@ namespace fastJSON
         /// <summary>
         /// You can set these paramters globally for all calls
         /// </summary>
-        public static JSONParameters GlobalParameters = new JSONParameters();
+        private static JSONParameters _globalParameters = new JSONParameters();
+
+        /// <summary>
+        /// You can set these paramters globally for all calls. This is provided for backwards compatibility and access the public static JSON.GlobalParameters property.
+        /// </summary>
+        public JSONParameters Parameters { get { return GlobalParameters; } set { GlobalParameters = value; } }
 
         private static readonly ReaderWriterLockSlim Lock = new ReaderWriterLockSlim();
 
-        public JSONParameters Parameters
+        /// <summary>
+        /// You can set these paramters globally for all calls. Thread safe.
+        /// </summary>
+        public static JSONParameters GlobalParameters
         {
             get
             {
@@ -96,7 +104,7 @@ namespace fastJSON
 
                     try
                     {
-                        return GlobalParameters;
+                        return _globalParameters;
                     }
                     finally
                     {
@@ -114,7 +122,7 @@ namespace fastJSON
                 {
                     try
                     {
-                        GlobalParameters = value;
+                        _globalParameters = value;
                     }
                     finally
                     {

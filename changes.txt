@@ -2,3 +2,4 @@ Forked from Mehdi Golam's 2.0.5
 1: Changed datetime serialization behavior for UTC times to make this more consistent [BREAKING CHANGE]
 2: Added polymorphic deserialization for interface members
 3: Added fix for concurrency bug
+4: Changed Parameters to public static GlobalParameters
