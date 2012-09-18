@@ -24,6 +24,33 @@ namespace UnitTests
         }
 
         [Test]
+        public void EmptyClassSmokeTest()
+        {
+            var o = new EmptyClass();
+            var json = fastJSON.JSON.Instance.ToJSON(o);
+            Trace.WriteLine(json);
+            Assert.AreEqual("{}", json);
+        }
+
+        [Test]
+        public void SimpleClassSmokeTest1()
+        {
+            var o = new SimpleClass1{Hello="World"};
+            var json = fastJSON.JSON.Instance.ToJSON(o);
+            Trace.WriteLine(json);
+            Assert.AreEqual(@"{""Hello"":""World""}", json);
+        }
+
+        [Test]
+        public void SimpleClassSmokeTest2()
+        {
+            var o = new SimpleClass2 { Hello = "World" ,FourtyTwo= 42};
+            var json = fastJSON.JSON.Instance.ToJSON(o);
+            Trace.WriteLine(json);
+            Assert.AreEqual(@"{""Hello"":""World"",""FourtyTwo"":42}", json);
+        }
+
+        [Test]
         public void SingleThreadRoundTripNoExtensions()
         {
             var o = new TestClassA { Id = Guid.NewGuid(), B = new TestClassB { SomeInt = 16 } };
@@ -325,5 +352,8 @@ namespace UnitTests
     public class ContainerConcrete { public ConcreteClass Payload { get; set; } }
     public class ContainerAbstract { public AbstractClass Payload { get; set; } }
 
+    public class EmptyClass { }
+    public class SimpleClass1 { public string Hello { get; set; } }
+    public class SimpleClass2 { public string Hello { get; set; } public int FourtyTwo { get; set; }}
 
 }

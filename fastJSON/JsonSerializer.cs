@@ -282,6 +282,8 @@ namespace fastJSON
         bool _TypesWritten = false;
         private void WriteObject(object obj)
         {
+            var typesnonempty = false;
+
             if (_params.UsingGlobalTypes == false)
                 _output.Append('{');
             else
@@ -307,7 +309,10 @@ namespace fastJSON
             if (_params.UseExtensions)
             {
                 if (_params.UsingGlobalTypes == false)
+                {
                     WritePairFast("$type", Reflection.Instance.GetTypeAssemblyName(t));
+                    typesnonempty = true;
+                }
                 else
                 {
                     int dt = 0;
@@ -318,23 +323,24 @@ namespace fastJSON
                         _globalTypes.Add(ct, dt);
                     }
                     WritePairFast("$type", dt.ToString());
+                    typesnonempty = true;
                 }
                 append = true;
             }
 
             List<Getters> g = Reflection.Instance.GetGetters(t);
+            int gc = g.Count;
             int i = g.Count;
             foreach (var p in g)
             {
                 i--;
-                if (append && i>0) 
-                    _output.Append(',');
+                if (append && i>0) _output.Append(',');
                 object o = p.Getter(obj);
                 if ((o == null || o is DBNull) && _params.SerializeNullValues == false)
                     append = false;
                 else
                 {
-                    if (i == 0) // last non null
+                    if (i == 0 && (gc>1 || typesnonempty) ) // last non null
                         _output.Append(",");
                     WritePair(p.Name, o);
                     if (o != null && _params.UseExtensions)
