@@ -1,7 +1,7 @@
 
 fastJson-janderit
 
-This is a fork of the fastJson library by Mehdi Golam.
+This is a fork of the fastJson library by Mehdi Gholam.
 
 Ths original library can be found here:
 http://fastjson.codeplex.com/

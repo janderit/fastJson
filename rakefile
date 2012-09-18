@@ -14,7 +14,7 @@ COPYRIGHT = "(c) 2012 Jander.IT"
 WORKSPACE = ENV["WORKSPACE"] || "."
 BUILD_NUMBER = (ENV["BUILD_NUMBER"] || "0").rjust(5,"0")
 BRANCH = ENV["BRANCH"] || "development"
-SUMMARY = "This is a fork of Mehdi Golam's fastJson library as found on code project. "
+SUMMARY = "This is a fork of Mehdi Gholam's fastJson library as found on code project. "
 DESCRIPTION = SUMMARY + "\r\n" + open("changes.txt" , &:read) if File.exists? "changes.txt"
 NUGETREPOTARGET = ENV["NUGETREPOTARGET"] || "nul:"
 
