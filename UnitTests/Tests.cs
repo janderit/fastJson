@@ -5,6 +5,7 @@ using NUnit.Framework;
 using System.Data;
 using System.Collections;
 using System.Threading;
+using fastJSON;
 
 namespace UnitTests
 {
@@ -238,6 +239,12 @@ namespace UnitTests
         }
 
         #endregion
+
+        [SetUp]
+        public void SetupParameters()
+        {
+            fastJSON.JSON.Instance.Parameters = new JSONParameters();
+        }
 
         [Test]
         public static void objectarray()

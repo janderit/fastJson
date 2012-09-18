@@ -10,7 +10,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C33B35EE-89F8-402A-9E6A-4663FD43152E}"
 	ProjectSection(SolutionItems) = preProject
 		changes.txt = changes.txt
-		fastJson-phj.sln.nuspec.erb = fastJson-phj.sln.nuspec.erb
+		fastJson-janderit.sln.nuspec.erb = fastJson-janderit.sln.nuspec.erb
 		LICENSE.html = LICENSE.html
 		rakefile. = rakefile.
 		README.md = README.md
