@@ -8,6 +8,7 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
 
 namespace fastJSON
 {
@@ -82,7 +83,47 @@ namespace fastJSON
         /// <summary>
         /// You can set these paramters globally for all calls
         /// </summary>
-        public static JSONParameters Parameters = new JSONParameters();
+        public static JSONParameters GlobalParameters = new JSONParameters();
+
+        private static readonly ReaderWriterLockSlim Lock = new ReaderWriterLockSlim();
+
+        public JSONParameters Parameters
+        {
+            get
+            {
+                if (Lock.TryEnterReadLock(100))
+                {
+
+                    try
+                    {
+                        return GlobalParameters;
+                    }
+                    finally
+                    {
+                        Lock.ExitReadLock();
+                    }
+                }
+                else
+                {
+                    throw new Exception("Unable to obtain read lock for fastJSON global parameters");
+                }
+            }
+            set
+            {
+                if (Lock.TryEnterWriteLock(250))
+                {
+                    try
+                    {
+                        GlobalParameters = value;
+                    }
+                    finally
+                    {
+                        Lock.ExitWriteLock();
+                    }
+                }
+                else throw new Exception("Unable to obtain write lock for fastJSON global parameters");
+            }
+        }
 
         private JSONParameters _params;
         
