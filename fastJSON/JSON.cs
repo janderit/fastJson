@@ -82,7 +82,8 @@ namespace fastJSON
         /// <summary>
         /// You can set these paramters globally for all calls
         /// </summary>
-        public JSONParameters Parameters = new JSONParameters();
+        public static JSONParameters Parameters = new JSONParameters();
+
         private JSONParameters _params;
         
         public string ToJSON(object obj)
