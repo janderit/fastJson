@@ -108,6 +108,7 @@ namespace UnitTests
         {
             Trace.WriteLine("ctor ConcurrentClassA. I will sleep for 2 seconds.");
             Thread.Sleep(2000);
+            Thread.MemoryBarrier(); // just to be sure the caches on multi-core processors do not hide the bug. For me, the bug is present without the memory barrier, too.
             Trace.WriteLine("ctor ConcurrentClassA. I am done sleeping.");
         }
 

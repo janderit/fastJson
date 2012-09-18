@@ -64,7 +64,17 @@ namespace fastJSON
 
     public sealed class JSON
     {
-        public readonly static JSON Instance = new JSON();
+        [ThreadStatic]
+        private static JSON _instance;
+
+        public static JSON Instance
+        {
+            get
+            {
+                if (_instance == null) _instance = new JSON();
+                return _instance;
+            }
+        }
 
         private JSON()
         {
