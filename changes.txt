@@ -1,4 +1,4 @@
-2012-09-17 forked Mehdi's 2.0.5
-2012-09-18 added fix for concurrency bug
-2012-09-18 changed datetime serialization behavior for UTC times to make this more consistent
-2012-09-18 added polymorphic deserialization for interface members
+Forked from Mehdi Golam's 2.0.5
+1: Changed datetime serialization behavior for UTC times to make this more consistent [BREAKING CHANGE]
+2: Added polymorphic deserialization for interface members
+3: Added fix for concurrency bug
