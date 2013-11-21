@@ -31,3 +31,4 @@ packages/*
 *.nupkg
 fastJson-janderit.nuspec
 fastJSON/Properties/AssemblyInfo.cs
+.localhistory/
