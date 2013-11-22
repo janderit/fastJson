@@ -3,3 +3,7 @@ Forked from Mehdi Gholam's 2.0.5
 2: Added polymorphic deserialization for interface members
 3: Added fix for concurrency bug
 4: Changed Parameters to public static GlobalParameters
+
+Version 2.1.0 (disconnected from development of the original fastJSON)
+- Custom serialization hook
+- Custom serializers for structs (analogous to scala's case classes)

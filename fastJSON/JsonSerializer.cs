@@ -6,12 +6,14 @@ using System.Data;
 #endif
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace fastJSON
 {
     internal sealed class JSONSerializer
     {
+        private readonly Dictionary<Type, Func<object, IEnumerable<SerializedField>>> _serializer;
         private StringBuilder _output = new StringBuilder();
         private StringBuilder _before = new StringBuilder();
         readonly int _MAX_DEPTH = 10;
@@ -19,9 +21,10 @@ namespace fastJSON
         private Dictionary<string, int> _globalTypes = new Dictionary<string, int>();
         private JSONParameters _params;
 
-        internal JSONSerializer(JSONParameters param)
+        internal JSONSerializer(JSONParameters @params, Dictionary<Type, Func<object, IEnumerable<SerializedField>>> serializer)
         {
-            _params = param;
+            _serializer = serializer;
+            _params = @params;
         }
 
         internal string ConvertToJSON(object obj)
@@ -280,6 +283,9 @@ namespace fastJSON
 #endif
 
         bool _TypesWritten = false;
+
+        
+
         private void WriteObject(object obj)
         {
             var typesnonempty = false;
@@ -302,61 +308,113 @@ namespace fastJSON
             if (_current_depth > _MAX_DEPTH)
                 throw new Exception("Serializer encountered maximum depth of " + _MAX_DEPTH);
 
-
-            Dictionary<string, string> map = new Dictionary<string, string>();
-            Type t = obj.GetType();
-            bool append = false;
-            if (_params.UseExtensions)
+            if (_serializer.ContainsKey(obj.GetType()))
             {
-                if (_params.UsingGlobalTypes == false)
+                var fields = _serializer[obj.GetType()](obj).ToList();
+
+                var sb = new StringBuilder(4 + (fields.Count*8) + fields.Sum(_ => _.Name.Length + _.Json.Length));
+                var first = true;
+                foreach (var field in fields)
                 {
-                    WritePairFast("$type", Reflection.Instance.GetTypeAssemblyName(t));
-                    typesnonempty = true;
-                }
-                else
-                {
-                    int dt = 0;
-                    string ct = Reflection.Instance.GetTypeAssemblyName(t);
-                    if (_globalTypes.TryGetValue(ct, out dt) == false)
+                    if (first)
                     {
-                        dt = _globalTypes.Count + 1;
-                        _globalTypes.Add(ct, dt);
+                        first = false;
+                        sb.Append("\"");
                     }
-                    WritePairFast("$type", dt.ToString());
-                    typesnonempty = true;
-                }
-                append = true;
-            }
-
-            List<Getters> g = Reflection.Instance.GetGetters(t);
-            int gc = g.Count;
-            int i = g.Count;
-            foreach (var p in g)
-            {
-                i--;
-                if (append && i>0) _output.Append(',');
-                object o = p.Getter(obj);
-                if ((o == null || o is DBNull) && _params.SerializeNullValues == false)
-                    append = false;
-                else
-                {
-                    if (i == 0 && (gc>1 || typesnonempty) ) // last non null
-                        _output.Append(",");
-                    WritePair(p.Name, o);
-                    if (o != null && _params.UseExtensions)
+                    else
                     {
-                        Type tt = o.GetType();
-                        if (tt == typeof(System.Object))
-                            map.Add(p.Name, tt.ToString());
+                        sb.Append(",\"");
+                    }
+
+                    sb.Append(field.Name);
+                    sb.Append("\":");
+                    sb.Append(field.Json);
+
+                }
+                _output.Append(sb);
+
+                if (_params.UseExtensions)
+                {
+                    _output.Append(",");
+                    if (_params.UsingGlobalTypes == false)
+                    {
+                        WritePairFast("$type", Reflection.Instance.GetTypeAssemblyName(obj.GetType()));
+                    }
+                    else
+                    {
+                        int dt = 0;
+                        string ct = Reflection.Instance.GetTypeAssemblyName(obj.GetType());
+                        if (_globalTypes.TryGetValue(ct, out dt) == false)
+                        {
+                            dt = _globalTypes.Count + 1;
+                            _globalTypes.Add(ct, dt);
+                        }
+                        WritePairFast("$type", dt.ToString());
+                    }
+                }
+
+            }
+            else
+            {
+
+                Dictionary<string, string> map = new Dictionary<string, string>();
+                Type t = obj.GetType();
+                bool append = false;
+                if (_params.UseExtensions)
+                {
+                    if (_params.UsingGlobalTypes == false)
+                    {
+                        WritePairFast("$type", Reflection.Instance.GetTypeAssemblyName(t));
+                        typesnonempty = true;
+                    }
+                    else
+                    {
+                        int dt = 0;
+                        string ct = Reflection.Instance.GetTypeAssemblyName(t);
+                        if (_globalTypes.TryGetValue(ct, out dt) == false)
+                        {
+                            dt = _globalTypes.Count + 1;
+                            _globalTypes.Add(ct, dt);
+                        }
+                        WritePairFast("$type", dt.ToString());
+                        typesnonempty = true;
                     }
                     append = true;
                 }
+
+                List<Getters> g = Reflection.Instance.GetGetters(t);
+                int gc = g.Count;
+                int i = g.Count;
+                foreach (var p in g)
+                {
+                    i--;
+                    if (append && i > 0) _output.Append(',');
+                    object o = p.Getter(obj);
+                    if ((o == null || o is DBNull) && _params.SerializeNullValues == false)
+                        append = false;
+                    else
+                    {
+                        if (i == 0 && (gc > 1 || typesnonempty)) // last non null
+                            _output.Append(",");
+                        WritePair(p.Name, o);
+                        if (o != null && _params.UseExtensions)
+                        {
+                            Type tt = o.GetType();
+                            if (tt == typeof (System.Object))
+                                map.Add(p.Name, tt.ToString());
+                        }
+                        append = true;
+                    }
+                }
+
+
+                if (map.Count > 0 && _params.UseExtensions)
+                {
+                    _output.Append(",\"$map\":");
+                    WriteStringDictionary(map);
+                }
             }
-            if (map.Count > 0 && _params.UseExtensions)
-            {
-                _output.Append(",\"$map\":");
-                WriteStringDictionary(map);
-            }
+
             _current_depth--;
             _output.Append('}');
             _current_depth--;
