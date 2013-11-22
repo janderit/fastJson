@@ -272,6 +272,7 @@ namespace fastJSON
             public Type bt;
             public Type changeType;
             public bool isDictionary;
+            public bool isList;
             public bool isValueType;
             public bool isGenericType;
             public bool isArray;
@@ -342,11 +343,14 @@ namespace fastJSON
             d.CanWrite = true;
             d.pt = t;
             d.Name = name;
-            d.isDictionary = t.Name.Contains("Dictionary");
+            d.isGenericType = t.IsGenericType;
+
+            d.isDictionary = t.IsGenericType && typeof (IDictionary).IsAssignableFrom(t);
+            d.isList = t.IsGenericType && typeof(IList).IsAssignableFrom(t);
+
             if (d.isDictionary)
                 d.GenericTypes = t.GetGenericArguments();
             d.isValueType = t.IsValueType;
-            d.isGenericType = t.IsGenericType;
             d.isArray = t.IsArray;
             if (d.isArray)
                 d.bt = t.GetElementType();
@@ -528,7 +532,7 @@ namespace fastJSON
                             else if (pi.isBool)
                                 oset = (bool) v;
 
-                            else if (pi.isGenericType && pi.isValueType == false && pi.isDictionary == false)
+                            else if (pi.isGenericType && !pi.isValueType && pi.isList)
                                 oset = CreateGenericList((List<object>) v, pi.pt, pi.bt, globaltypes);
 
                             else if (pi.isByteArray)
