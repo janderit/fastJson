@@ -1,6 +1,4 @@
-﻿#define CUSTOMTYPE
-
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 #if !SILVERLIGHT
@@ -8,8 +6,10 @@ using System.Data;
 #endif
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Text;
 using System.Threading;
 
 namespace fastJSON
@@ -163,7 +163,7 @@ namespace fastJSON
             // FEATURE : enable extensions when you can deserialize anon types
             if (_params.EnableAnonymousTypes) { _params.UseExtensions = false; _params.UsingGlobalTypes = false; Reflection.Instance.ShowReadOnlyProperties = true; }
             _usingglobals = _params.UsingGlobalTypes;
-            return new JSONSerializer(_params).ConvertToJSON(obj);
+            return new JSONSerializer(_params, _serializer).ConvertToJSON(obj);
         }
 
         public object Parse(string json)
@@ -189,17 +189,25 @@ namespace fastJSON
             _params.FixValues();
             Reflection.Instance.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
             Type t = null;
+
             if (type != null && type.IsGenericType)
                 t = type.GetGenericTypeDefinition();
             if (t == typeof(Dictionary<,>) || t == typeof(List<>))
                 _params.UsingGlobalTypes = false;
+
             _usingglobals = _params.UsingGlobalTypes;
 
             object o = new JsonParser(json, Parameters.IgnoreCaseOnDeserialize).Decode();
 
+            return DecodeParsed(type, o);
+        }
+
+        private object DecodeParsed(Type type, object o)
+        {
             if (o is IDictionary)
             {
-                if (type != null && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Dictionary<,>)) // deserialize a dictionary
+                if (type != null && type.IsGenericType && type.GetGenericTypeDefinition() == typeof (Dictionary<,>))
+                    // deserialize a dictionary
                     return RootDictionary(o, type);
                 else // deserialize an object
                     return ParseDictionary(o as Dictionary<string, object>, null, type, null);
@@ -207,10 +215,10 @@ namespace fastJSON
 
             if (o is List<object>)
             {
-                if (type != null && type.GetGenericTypeDefinition() == typeof(Dictionary<,>)) // kv format
+                if (type != null && type.GetGenericTypeDefinition() == typeof (Dictionary<,>)) // kv format
                     return RootDictionary(o, type);
-                
-                if (type != null && type.GetGenericTypeDefinition() == typeof(List<>)) // deserialize to generic list
+
+                if (type != null && type.GetGenericTypeDefinition() == typeof (List<>)) // deserialize to generic list
                     return RootList(o, type);
                 else
                     return (o as List<object>).ToArray();
@@ -242,28 +250,6 @@ namespace fastJSON
         {
             return ToObject<T>(ToJSON(obj));
         }
-        
-#if CUSTOMTYPE
-        internal SafeDictionary<Type, Serialize> _customSerializer = new SafeDictionary<Type, Serialize>();
-        internal SafeDictionary<Type, Deserialize> _customDeserializer = new SafeDictionary<Type, Deserialize>();
-
-        public void RegisterCustomType(Type type, Serialize serializer, Deserialize deserializer)
-        {
-            if (type != null && serializer != null && deserializer != null)
-            {
-                _customSerializer.Add(type, serializer);
-                _customDeserializer.Add(type, deserializer);
-                // reset property cache
-                _propertycache = new SafeDictionary<string, SafeDictionary<string, myPropInfo>>();
-            }
-        }
-
-        internal bool IsTypeRegistered(Type t)
-        {
-            Serialize s;
-            return _customSerializer.TryGetValue(t, out s);
-        }
-#endif
 
         #region [   JSON specific reflection   ]
 
@@ -491,6 +477,12 @@ namespace fastJSON
             if (type == null)
                 throw new Exception("Cannot determine type");
 
+            if (_deserializer.ContainsKey(type))
+            {
+                var fields = d.Select(kvp => new DeserializedField(kvp.Key, kvp.Value));
+                return _deserializer[type](fields, DecodeParsed);
+            }
+
             string typename = type.FullName;
             object o = input;
             if (o == null)
@@ -513,6 +505,7 @@ namespace fastJSON
                 {
                     object v = d[name];
 
+                    
                     if (v != null)
                     {
                         object oset = null;
@@ -903,6 +896,27 @@ namespace fastJSON
         }
 #endif
         #endregion
+
+
+        private Dictionary<Type, Func<object, IEnumerable<SerializedField>>> _serializer = new Dictionary<Type, Func<object, IEnumerable<SerializedField>>>();
+        private Dictionary<Type, Func<IEnumerable<DeserializedField>, Func<Type, object, object>, object>> _deserializer = new Dictionary<Type, Func<IEnumerable<DeserializedField>, Func<Type, object, object>, object>>();
+
+
+        public void RegisterCustomSerializer<T>(CustomSerializer<T> customSerializer)
+        {
+            if (_serializer.ContainsKey(typeof (T))) _serializer.Remove(typeof (T));
+            if (_deserializer.ContainsKey(typeof (T))) _deserializer.Remove(typeof (T));
+            _serializer.Add(typeof(T), o=>customSerializer.ToJson((T)o, ToJSON));
+            _deserializer.Add(typeof(T), (json, decode)=>customSerializer.ToObject(json, decode));
+        }
+
+        public void RegisterCustomSerializer<T>(Func<T, Func<object, string>, IEnumerable<SerializedField>> serializer, Func<IEnumerable<DeserializedField>, Func<Type, object, object>, T> deserializer)
+        {
+            if (_serializer.ContainsKey(typeof(T))) _serializer.Remove(typeof(T));
+            if (_deserializer.ContainsKey(typeof(T))) _deserializer.Remove(typeof(T));
+            _serializer.Add(typeof(T), o => serializer((T)o, ToJSON));
+            _deserializer.Add(typeof(T), (json, decode) => deserializer(json, decode));
+        }
     }
 
 }

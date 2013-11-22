@@ -53,8 +53,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Concurrency_bug_in_2_0_5.cs" />
+<<<<<<< HEAD
     <Compile Include="ImmutableStructures.cs" />
+=======
     <Compile Include="CustomSerializers.cs" />
+>>>>>>> b3c1bdd... Custom serialization
     <Compile Include="JanderItIntegrationTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Regressions\Bug002.cs" />

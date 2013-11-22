@@ -4,6 +4,11 @@ Forked from Mehdi Gholam's 2.0.5
 3: Added fix for concurrency bug
 4: Changed Parameters to public static GlobalParameters
 
+<<<<<<< HEAD
+2.0.6
+- Support for serializing immutable Value Objects (structs)
+=======
 Version 2.1.0 (disconnected from development of the original fastJSON)
 - Custom serialization hook
 - Custom serializers for structs (analogous to scala's case classes)
+>>>>>>> b3c1bdd... Custom serialization
