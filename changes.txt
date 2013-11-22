@@ -3,3 +3,6 @@ Forked from Mehdi Gholam's 2.0.5
 2: Added polymorphic deserialization for interface members
 3: Added fix for concurrency bug
 4: Changed Parameters to public static GlobalParameters
+
+2.0.6
+- Support for serializing immutable Value Objects (structs)

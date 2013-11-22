@@ -560,14 +560,14 @@ namespace fastJSON
                         else if (pi.isDateTime)
                             oset = CreateDateTime((string) v);
 
-                        else if ((pi.isClass || pi.isInterface) && v is Dictionary<string, object>)
-                            oset = ParseDictionary((Dictionary<string, object>) v, globaltypes, pi.pt, pi.getter(o));
+                        else if ((pi.isClass || pi.isInterface || pi.isValueType) && v is Dictionary<string, object>)
+                            oset = ParseDictionary((Dictionary<string, object>)v, globaltypes, pi.pt, pi.getter(o));
 
                         else if (pi.isValueType)
                             oset = ChangeType(v, pi.changeType);
 
                         else if (v is List<object>)
-                            oset = CreateArray((List<object>) v, pi.pt, typeof (object), globaltypes);
+                            oset = CreateArray((List<object>)v, pi.pt, typeof(object), globaltypes);
 
                         else
                             oset = v;
