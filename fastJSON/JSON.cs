@@ -1,4 +1,6 @@
-﻿using System;
+﻿#define CUSTOMTYPE
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 #if !SILVERLIGHT
@@ -240,7 +242,7 @@ namespace fastJSON
         {
             return ToObject<T>(ToJSON(obj));
         }
-
+        
 #if CUSTOMTYPE
         internal SafeDictionary<Type, Serialize> _customSerializer = new SafeDictionary<Type, Serialize>();
         internal SafeDictionary<Type, Deserialize> _customDeserializer = new SafeDictionary<Type, Deserialize>();
