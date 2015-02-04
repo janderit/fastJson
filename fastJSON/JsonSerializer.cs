@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 #if !SILVERLIGHT
@@ -14,7 +13,7 @@ namespace fastJSON
 {
     internal sealed class JSONSerializer
     {
-        private readonly Dictionary<Type, Func<object, IEnumerable<SerializedField>>> _serializer;
+        private readonly Dictionary<Type, Func<object, CustomSerialization>> _serializer;
         private StringBuilder _output = new StringBuilder();
         private StringBuilder _before = new StringBuilder();
         readonly int _MAX_DEPTH = 10;
@@ -22,7 +21,7 @@ namespace fastJSON
         private Dictionary<string, int> _globalTypes = new Dictionary<string, int>();
         private JSONParameters _params;
 
-        internal JSONSerializer(JSONParameters @params, Dictionary<Type, Func<object, IEnumerable<SerializedField>>> serializer)
+        internal JSONSerializer(JSONParameters @params, Dictionary<Type, Func<object, CustomSerialization>> serializer)
         {
             _serializer = serializer;
             _params = @params;
@@ -290,70 +289,95 @@ namespace fastJSON
         private void WriteObject(object obj)
         {
             var typesnonempty = false;
+            var iscustom = _serializer.ContainsKey(obj.GetType());
 
-            if (_params.UsingGlobalTypes == false)
-                _output.Append('{');
-            else
+            FieldSet fieldSet = null;
+            Textual textual = null;
+
+            if (iscustom)
             {
-                if (_TypesWritten == false)
+                var custom = _serializer[obj.GetType()](obj);
+                fieldSet = custom as FieldSet;
+                textual = custom as Textual;
+            }
+
+            if (textual == null)
+            {
+
+                if (_params.UsingGlobalTypes == false)
+                    _output.Append('{');
+                else
                 {
-                    _output.Append("{");
-                    _before = _output;
-                    _output = new StringBuilder();
+                    if (_TypesWritten == false)
+                    {
+                        _output.Append("{");
+                        _before = _output;
+                        _output = new StringBuilder();
+                    }
+                    else
+                        _output.Append("{");
+                }
+                _TypesWritten = true;
+                _current_depth++;
+                if (_current_depth > _MAX_DEPTH)
+                    throw new Exception("Serializer encountered maximum depth of " + _MAX_DEPTH);
+            }
+
+
+            if (iscustom)
+            {
+
+                if (fieldSet!=null)
+                {
+                    var fields = fieldSet.Fields;
+                    var sb = new StringBuilder(4 + (fields.Count*8) + fields.Sum(_ => _.Name.Length + _.Json.Length));
+                    var first = true;
+                    foreach (var field in fields)
+                    {
+                        if (first)
+                        {
+                            first = false;
+                            sb.Append("\"");
+                        }
+                        else
+                        {
+                            sb.Append(",\"");
+                        }
+
+                        sb.Append(field.Name);
+                        sb.Append("\":");
+                        sb.Append(field.Json);
+
+                    }
+                    _output.Append(sb);
+
+                    if (_params.UseExtensions)
+                    {
+                        _output.Append(",");
+                        if (_params.UsingGlobalTypes == false)
+                        {
+                            WritePairFast("$type", Reflection.Instance.GetTypeAssemblyName(obj.GetType()));
+                        }
+                        else
+                        {
+                            int dt = 0;
+                            string ct = Reflection.Instance.GetTypeAssemblyName(obj.GetType());
+                            if (_globalTypes.TryGetValue(ct, out dt) == false)
+                            {
+                                dt = _globalTypes.Count + 1;
+                                _globalTypes.Add(ct, dt);
+                            }
+                            WritePairFast("$type", dt.ToString());
+                        }
+                    }
                 }
                 else
-                    _output.Append("{");
-            }
-            _TypesWritten = true;
-            _current_depth++;
-            if (_current_depth > _MAX_DEPTH)
-                throw new Exception("Serializer encountered maximum depth of " + _MAX_DEPTH);
-
-            if (_serializer.ContainsKey(obj.GetType()))
-            {
-                var fields = _serializer[obj.GetType()](obj).ToList();
-
-                var sb = new StringBuilder(4 + (fields.Count*8) + fields.Sum(_ => _.Name.Length + _.Json.Length));
-                var first = true;
-                foreach (var field in fields)
                 {
-                    if (first)
-                    {
-                        first = false;
-                        sb.Append("\"");
-                    }
-                    else
-                    {
-                        sb.Append(",\"");
-                    }
-
-                    sb.Append(field.Name);
-                    sb.Append("\":");
-                    sb.Append(field.Json);
-
+                    var data = (textual).Value;
+                    _output.Append('"');
+                    _output.Append(data);
+                    _output.Append('"');
                 }
-                _output.Append(sb);
-
-                if (_params.UseExtensions)
-                {
-                    _output.Append(",");
-                    if (_params.UsingGlobalTypes == false)
-                    {
-                        WritePairFast("$type", Reflection.Instance.GetTypeAssemblyName(obj.GetType()));
-                    }
-                    else
-                    {
-                        int dt = 0;
-                        string ct = Reflection.Instance.GetTypeAssemblyName(obj.GetType());
-                        if (_globalTypes.TryGetValue(ct, out dt) == false)
-                        {
-                            dt = _globalTypes.Count + 1;
-                            _globalTypes.Add(ct, dt);
-                        }
-                        WritePairFast("$type", dt.ToString());
-                    }
-                }
-
             }
             else
             {
@@ -416,8 +440,11 @@ namespace fastJSON
                 }
             }
 
-            _current_depth--;
-            _output.Append('}');
+            if (textual == null)
+            {
+                _current_depth--;
+                _output.Append('}');
+            }
             _current_depth--;
         }
 

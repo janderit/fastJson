@@ -83,7 +83,7 @@ namespace UnitTests
             Assert.AreEqual("Heute", o2.Inner.Datum);
             Assert.AreEqual(o.Inner.Id, o2.Inner.Id);
         }
-
+        
         [Test]
         public void CustomSerializerWithinOuter()
         {
@@ -95,6 +95,26 @@ namespace UnitTests
             Assert.IsNotNull(o2);
             Assert.IsNotNull(o2.Inner);
             Assert.AreEqual("Moon", o2.Inner.Hello);
+        }
+
+        [Test]
+        public void CustomSerializerWithTextRepresentation()
+        {
+            var o = new SimpleClass4 { Hello = "World", Inner = new InnerClass { Datum = "Heute", Id = Guid.NewGuid() } };
+            fastJSON.JSON.Instance.RegisterCustomSerializer<SimpleClass4>(new SimpleClass4Serializer());
+            fastJSON.JSON.Instance.RegisterCustomSerializer<InnerClass>((i,d)=>i.Datum+"|"+i.Id, (line, defer) =>
+            {
+                var parts = line.Split('|');
+                return new InnerClass {Datum = parts[0], Id = Guid.Parse(parts[1])};
+            });
+            var json = fastJSON.JSON.Instance.ToJSON(o);
+            Trace.WriteLine(json);
+            var o2 = JSON.Instance.ToObject<SimpleClass4>(json);
+            Assert.IsNotNull(o2);
+            Assert.AreEqual("World!!!", o2.Hello);
+            Assert.IsNotNull(o2.Inner);
+            Assert.AreEqual("Heute", o2.Inner.Datum);
+            Assert.AreEqual(o.Inner.Id, o2.Inner.Id);
         }
 
     }

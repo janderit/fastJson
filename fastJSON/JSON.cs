@@ -223,6 +223,11 @@ namespace fastJSON
                 else
                     return (o as List<object>).ToArray();
             }
+            if (type!=null && _deserializer.ContainsKey(type) && (o is string))
+            {
+                var deser = (TextualDeserializer) _deserializer[type];
+                return deser.Deserializer((string) o, DecodeParsed);
+            }
             return o;
         }
 
@@ -480,7 +485,7 @@ namespace fastJSON
             if (_deserializer.ContainsKey(type))
             {
                 var fields = d.Select(kvp => new DeserializedField(kvp.Key, kvp.Value));
-                return _deserializer[type](fields, DecodeParsed);
+                return ((FieldSetDeserializer)_deserializer[type]).Deserializer(fields, DecodeParsed);
             }
 
             string typename = type.FullName;
@@ -898,25 +903,36 @@ namespace fastJSON
         #endregion
 
 
-        private Dictionary<Type, Func<object, IEnumerable<SerializedField>>> _serializer = new Dictionary<Type, Func<object, IEnumerable<SerializedField>>>();
-        private Dictionary<Type, Func<IEnumerable<DeserializedField>, Func<Type, object, object>, object>> _deserializer = new Dictionary<Type, Func<IEnumerable<DeserializedField>, Func<Type, object, object>, object>>();
+        private static readonly Dictionary<Type, Func<object, CustomSerialization>> _serializer = new Dictionary<Type, Func<object, CustomSerialization>>();
+        private static readonly Dictionary<Type, CustomDeserialization> _deserializer = new Dictionary<Type, CustomDeserialization>();
 
 
         public void RegisterCustomSerializer<T>(CustomSerializer<T> customSerializer)
         {
             if (_serializer.ContainsKey(typeof (T))) _serializer.Remove(typeof (T));
             if (_deserializer.ContainsKey(typeof (T))) _deserializer.Remove(typeof (T));
-            _serializer.Add(typeof(T), o=>customSerializer.ToJson((T)o, ToJSON));
-            _deserializer.Add(typeof(T), (json, decode)=>customSerializer.ToObject(json, decode));
+            _serializer.Add(typeof(T), o => new FieldSet(customSerializer.ToJson((T)o, ToJSON).ToList()));
+            _deserializer.Add(typeof(T), new FieldSetDeserializer((json, decode)=>customSerializer.ToObject(json, decode)));
         }
 
-        public void RegisterCustomSerializer<T>(Func<T, Func<object, string>, IEnumerable<SerializedField>> serializer, Func<IEnumerable<DeserializedField>, Func<Type, object, object>, T> deserializer)
+        public void RegisterCustomSerializer<T>(Func<T, Func<object, string>, CustomSerialization> serializer, CustomDeserialization deserializer)
         {
             if (_serializer.ContainsKey(typeof(T))) _serializer.Remove(typeof(T));
             if (_deserializer.ContainsKey(typeof(T))) _deserializer.Remove(typeof(T));
             _serializer.Add(typeof(T), o => serializer((T)o, ToJSON));
-            _deserializer.Add(typeof(T), (json, decode) => deserializer(json, decode));
+            _deserializer.Add(typeof(T), deserializer);
         }
+
+        public void RegisterCustomSerializer<T>(Func<T, Func<object, string>, string> serializer, Func<string, Func<Type, object, object>, T> deserializer)
+        {
+            RegisterCustomSerializer<T>((t,d)=>new Textual(serializer(t,d)), new TextualDeserializer((s,d)=>deserializer(s,d)));
+        }
+
+        public void RegisterCustomSerializer<T>(Func<T, Func<object, string>, IEnumerable<SerializedField>> serializer, Func<IEnumerable<DeserializedField>, Func<Type, object, object>, T> deserializer)
+        {
+            RegisterCustomSerializer<T>((t, d) => new FieldSet(serializer(t, d).ToList()), new FieldSetDeserializer((s,d)=>deserializer(s,d)));
+        }
+
     }
 
 }
