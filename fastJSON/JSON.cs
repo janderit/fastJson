@@ -382,17 +382,23 @@ namespace fastJSON
             if (conversionType == typeof(int))
                 return (int)((long)value);
 
-            else if (conversionType == typeof(long))
+            if (conversionType == typeof(long))
                 return (long)value;
 
-            else if (conversionType == typeof(string))
+            if (conversionType == typeof(string))
                 return (string)value;
 
-            else if (conversionType == typeof(Guid))
+            if (conversionType == typeof(Guid))
                 return CreateGuid((string)value);
 
-            else if (conversionType.IsEnum)
+            if (conversionType.IsEnum)
                 return CreateEnum(conversionType, (string)value);
+
+            if (_deserializer.ContainsKey(conversionType))
+            {
+                var deser = (TextualDeserializer)_deserializer[conversionType];
+                return deser.Deserializer((string)value, DecodeParsed);
+            }
 
             return Convert.ChangeType(value, conversionType, CultureInfo.InvariantCulture);
         }
