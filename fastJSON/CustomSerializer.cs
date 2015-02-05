@@ -1,87 +1,35 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection.Emit;
+using System.Text;
 
 namespace fastJSON
 {
-    public interface CustomSerializer<T>
+    public struct SerializerData
     {
-        IEnumerable<SerializedField> ToJson(T t, Func<object, string> serializefields);
-        T ToObject(IEnumerable<DeserializedField> json, Func<Type, object, object> deserializefields);
-    }
-
-    public interface CustomSerialization
-    {
-    }
-
-    public interface CustomDeserialization
-    {
-        
-    }
-
-    public struct FieldSetDeserializer : CustomDeserialization
-    {
-        public readonly Func<IEnumerable<DeserializedField>, Func<Type, object, object>, object> Deserializer;
-
-        public FieldSetDeserializer(Func<IEnumerable<DeserializedField>, Func<Type, object, object>, object> deserializer) : this()
+        internal SerializerData(Action payload)
         {
-            Deserializer = deserializer;
+            Payload = payload;
         }
+
+        internal readonly Action Payload;
     }
 
-    public struct TextualDeserializer : CustomDeserialization
+    public interface Serializer
     {
-        public readonly Func<string, Func<Type, object, object>, object> Deserializer;
-
-        public TextualDeserializer(Func<string, Func<Type, object, object>, object> deserializer)
-            : this()
-        {
-            Deserializer = deserializer;
-        }
+        void WriteValue(string value);
+        void WriteField(string key, SerializerData field);
+        void WriteList(IEnumerable<SerializerData> items);
+        void EmptyObject();
+        void Defer(SerializerData deferral);
     }
 
-    public sealed class Textual : CustomSerialization
-    {
-        public readonly String Value;
+    public delegate void CustomSerialization(object t, Serializer output, Func<object, SerializerData> defer_back);
+    public delegate object CustomDeserialization_value(string json, Func<Type, object, object> deserializefields);
+    public delegate object CustomDeserialization_list(List<object> json, Func<Type, object, object> deserializefields);
+    public delegate object CustomDeserialization_dict(Dictionary<string, object> dict, Func<Type, object, object> deserializefields);
 
-        public Textual(string value)
-        {
-            Value = value;
-        }
-    }
-
-    public sealed class FieldSet : CustomSerialization
-    {
-        public readonly List<SerializedField> Fields;
-
-        public FieldSet(List<SerializedField> fields)
-        {
-            Fields = fields;
-        }
-    }
-
-    public struct SerializedField
-    {
-        public string Name;
-        public string Json;
-
-        public SerializedField(string name, string json)
-        {
-            Name = name;
-            Json = json;
-        }
-    }
-
-    public struct DeserializedField
-    {
-        public string Name;
-        public object Parsed;
-
-        public DeserializedField(string name, object parsed)
-        {
-            Name = name;
-            Parsed = parsed;
-        }
-    }
-
+    public delegate void CustomSerialization<in T>(T t, Serializer output, Func<object, SerializerData> defer_back);
+    public delegate T CustomDeserialization_value<out T>(string json, Func<Type, object, object> deserializefields);
+    public delegate T CustomDeserialization_list<out T>(List<object> json, Func<Type, object, object> deserializefields);
+    public delegate T CustomDeserialization_dict<out T>(Dictionary<string, object> dict, Func<Type, object, object> deserializefields);
 }

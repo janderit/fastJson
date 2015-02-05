@@ -163,7 +163,7 @@ namespace fastJSON
             // FEATURE : enable extensions when you can deserialize anon types
             if (_params.EnableAnonymousTypes) { _params.UseExtensions = false; _params.UsingGlobalTypes = false; Reflection.Instance.ShowReadOnlyProperties = true; }
             _usingglobals = _params.UsingGlobalTypes;
-            return new JSONSerializer(_params, _serializer).ConvertToJSON(obj);
+            return new JSONSerializer(_params, _serializers).ConvertToJSON(obj);
         }
 
         public object Parse(string json)
@@ -206,6 +206,8 @@ namespace fastJSON
         {
             if (o is IDictionary)
             {
+                if (type != null && _deserializers_dict.ContainsKey(type)) return _deserializers_dict[type](o as Dictionary<string, object>, DecodeParsed);
+
                 if (type != null && type.IsGenericType && type.GetGenericTypeDefinition() == typeof (Dictionary<,>))
                     // deserialize a dictionary
                     return RootDictionary(o, type);
@@ -215,6 +217,8 @@ namespace fastJSON
 
             if (o is List<object>)
             {
+                if (type != null && _deserializers_list.ContainsKey(type)) return _deserializers_list[type](o as List<object>, DecodeParsed);
+
                 if (type != null && type.GetGenericTypeDefinition() == typeof (Dictionary<,>)) // kv format
                     return RootDictionary(o, type);
 
@@ -223,11 +227,9 @@ namespace fastJSON
                 else
                     return (o as List<object>).ToArray();
             }
-            if (type!=null && _deserializer.ContainsKey(type) && (o is string))
-            {
-                var deser = (TextualDeserializer) _deserializer[type];
-                return deser.Deserializer((string) o, DecodeParsed);
-            }
+
+            if (o is string && type != null && _deserializers_string.ContainsKey(type)) return _deserializers_string[type]((string)o, DecodeParsed);
+
             return o;
         }
 
@@ -394,11 +396,7 @@ namespace fastJSON
             if (conversionType.IsEnum)
                 return CreateEnum(conversionType, (string)value);
 
-            if (_deserializer.ContainsKey(conversionType))
-            {
-                var deser = (TextualDeserializer)_deserializer[conversionType];
-                return deser.Deserializer((string)value, DecodeParsed);
-            }
+            if (value is string && _deserializers_string.ContainsKey(conversionType)) return _deserializers_string[conversionType]((string)value, DecodeParsed);
 
             return Convert.ChangeType(value, conversionType, CultureInfo.InvariantCulture);
         }
@@ -487,12 +485,6 @@ namespace fastJSON
 
             if (type == null)
                 throw new Exception("Cannot determine type");
-
-            if (_deserializer.ContainsKey(type))
-            {
-                var fields = d.Select(kvp => new DeserializedField(kvp.Key, kvp.Value));
-                return ((FieldSetDeserializer)_deserializer[type]).Deserializer(fields, DecodeParsed);
-            }
 
             string typename = type.FullName;
             object o = input;
@@ -909,36 +901,54 @@ namespace fastJSON
         #endregion
 
 
-        private static readonly Dictionary<Type, Func<object, CustomSerialization>> _serializer = new Dictionary<Type, Func<object, CustomSerialization>>();
-        private static readonly Dictionary<Type, CustomDeserialization> _deserializer = new Dictionary<Type, CustomDeserialization>();
+        private static readonly Dictionary<Type, CustomSerialization> _serializers = new Dictionary<Type, CustomSerialization>();
+        private static readonly Dictionary<Type, CustomDeserialization_dict> _deserializers_dict = new Dictionary<Type, CustomDeserialization_dict>();
+        private static readonly Dictionary<Type, CustomDeserialization_list> _deserializers_list = new Dictionary<Type, CustomDeserialization_list>();
+        private static readonly Dictionary<Type, CustomDeserialization_value> _deserializers_string = new Dictionary<Type, CustomDeserialization_value>();
 
-
-        public void RegisterCustomSerializer<T>(CustomSerializer<T> customSerializer)
+        public void RegisterCustomSerializer(Type type, CustomSerialization serialize)
         {
-            if (_serializer.ContainsKey(typeof (T))) _serializer.Remove(typeof (T));
-            if (_deserializer.ContainsKey(typeof (T))) _deserializer.Remove(typeof (T));
-            _serializer.Add(typeof(T), o => new FieldSet(customSerializer.ToJson((T)o, ToJSON).ToList()));
-            _deserializer.Add(typeof(T), new FieldSetDeserializer((json, decode)=>customSerializer.ToObject(json, decode)));
+            if (_serializers.ContainsKey(type)) _serializers.Remove(type);
+            _serializers.Add(type, serialize);
         }
 
-        public void RegisterCustomSerializer<T>(Func<T, Func<object, string>, CustomSerialization> serializer, CustomDeserialization deserializer)
+        public void RegisterCustomDeserializer(Type type, CustomDeserialization_dict deserialize)
         {
-            if (_serializer.ContainsKey(typeof(T))) _serializer.Remove(typeof(T));
-            if (_deserializer.ContainsKey(typeof(T))) _deserializer.Remove(typeof(T));
-            _serializer.Add(typeof(T), o => serializer((T)o, ToJSON));
-            _deserializer.Add(typeof(T), deserializer);
+            if (_deserializers_dict.ContainsKey(type)) _deserializers_dict.Remove(type);
+            _deserializers_dict.Add(type, deserialize);
         }
 
-        public void RegisterCustomSerializer<T>(Func<T, Func<object, string>, string> serializer, Func<string, Func<Type, object, object>, T> deserializer)
+        public void RegisterCustomDeserializer(Type type, CustomDeserialization_list deserialize)
         {
-            RegisterCustomSerializer<T>((t,d)=>new Textual(serializer(t,d)), new TextualDeserializer((s,d)=>deserializer(s,d)));
+            if (_deserializers_list.ContainsKey(type)) _deserializers_list.Remove(type);
+            _deserializers_list.Add(type, deserialize);
         }
 
-        public void RegisterCustomSerializer<T>(Func<T, Func<object, string>, IEnumerable<SerializedField>> serializer, Func<IEnumerable<DeserializedField>, Func<Type, object, object>, T> deserializer)
+        public void RegisterCustomDeserializer(Type type, CustomDeserialization_value deserialize)
         {
-            RegisterCustomSerializer<T>((t, d) => new FieldSet(serializer(t, d).ToList()), new FieldSetDeserializer((s,d)=>deserializer(s,d)));
+            if (_deserializers_string.ContainsKey(type)) _deserializers_string.Remove(type);
+            _deserializers_string.Add(type, deserialize);
         }
 
+        public void RegisterCustomSerializer<T>(CustomSerialization<T> serialize)
+        {
+            RegisterCustomSerializer(typeof (T), (t, output, defer) => serialize((T) t, output, defer));
+        }
+
+        public void RegisterCustomDeserializer_d<T>(CustomDeserialization_dict<T> deserialize)
+        {
+            RegisterCustomDeserializer(typeof (T), (input, defer) => deserialize(input, defer));
+        }
+
+        public void RegisterCustomDeserializer_l<T>(CustomDeserialization_list<T> deserialize)
+        {
+            RegisterCustomDeserializer(typeof(T), (input, defer) => deserialize(input, defer));
+        }
+
+        public void RegisterCustomDeserializer_v<T>(CustomDeserialization_value<T> deserialize)
+        {
+            RegisterCustomDeserializer(typeof(T), (input, defer) => deserialize(input, defer));
+        }
     }
 
 }

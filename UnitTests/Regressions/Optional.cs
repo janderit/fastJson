@@ -1,9 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Security.Cryptography.X509Certificates;
 
 namespace UnitTests.Regressions.reftype
 {
-    public struct Optional<T>
+    public interface OptionalBox
+    {
+        Optional<object> BOX();
+    }
+
+    public struct Optional<T> : OptionalBox
     {
         private bool Equals(Optional<T> other)
         {
@@ -19,6 +25,11 @@ namespace UnitTests.Regressions.reftype
                 if (HasValue) result = (result * 397) ^ EqualityComparer<T>.Default.GetHashCode(Value);
                 return result;
             }
+        }
+
+        public Optional<object> BOX()
+        {
+            return !HasValue ? new Optional<object>() : Value;
         }
 
         public static bool operator ==(Optional<T> left, Optional<T> right)

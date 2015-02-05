@@ -13,18 +13,18 @@ namespace fastJSON
 {
     internal sealed class JSONSerializer
     {
-        private readonly Dictionary<Type, Func<object, CustomSerialization>> _serializer;
         private StringBuilder _output = new StringBuilder();
         private StringBuilder _before = new StringBuilder();
         readonly int _MAX_DEPTH = 10;
         int _current_depth = 0;
         private Dictionary<string, int> _globalTypes = new Dictionary<string, int>();
         private JSONParameters _params;
-
-        internal JSONSerializer(JSONParameters @params, Dictionary<Type, Func<object, CustomSerialization>> serializer)
+        private readonly Dictionary<Type, CustomSerialization> _serializers;
+        
+        internal JSONSerializer(JSONParameters @params, Dictionary<Type, CustomSerialization> serializers)
         {
-            _serializer = serializer;
             _params = @params;
+            _serializers = serializers;
         }
 
         internal string ConvertToJSON(object obj)
@@ -289,20 +289,22 @@ namespace fastJSON
         private void WriteObject(object obj)
         {
             var typesnonempty = false;
-            var iscustom = _serializer.ContainsKey(obj.GetType());
 
-            FieldSet fieldSet = null;
-            Textual textual = null;
-
-            if (iscustom)
+            if (_serializers.ContainsKey(obj.GetType()))
             {
-                var custom = _serializer[obj.GetType()](obj);
-                fieldSet = custom as FieldSet;
-                textual = custom as Textual;
+                var custom = _serializers[obj.GetType()];
+                var target = new CustomTarget(_output, WriteValue);
+                custom(obj, target, target.Defer);
+                target.WriteToTarget();
             }
-
-            if (textual == null)
+            else if (_serializers.ContainsKey(obj.GetType().GetGenericTypeDefinition()))
             {
+                var custom = _serializers[obj.GetType().GetGenericTypeDefinition()];
+                var target = new CustomTarget(_output, WriteValue);
+                custom(obj, target, target.Defer);
+                target.WriteToTarget();
+            }
+            else { 
 
                 if (_params.UsingGlobalTypes == false)
                     _output.Append('{');
@@ -321,68 +323,9 @@ namespace fastJSON
                 _current_depth++;
                 if (_current_depth > _MAX_DEPTH)
                     throw new Exception("Serializer encountered maximum depth of " + _MAX_DEPTH);
-            }
 
 
-            if (iscustom)
-            {
-
-                if (fieldSet!=null)
-                {
-                    var fields = fieldSet.Fields;
-                    var sb = new StringBuilder(4 + (fields.Count*8) + fields.Sum(_ => _.Name.Length + _.Json.Length));
-                    var first = true;
-                    foreach (var field in fields)
-                    {
-                        if (first)
-                        {
-                            first = false;
-                            sb.Append("\"");
-                        }
-                        else
-                        {
-                            sb.Append(",\"");
-                        }
-
-                        sb.Append(field.Name);
-                        sb.Append("\":");
-                        sb.Append(field.Json);
-
-                    }
-                    _output.Append(sb);
-
-                    if (_params.UseExtensions)
-                    {
-                        _output.Append(",");
-                        if (_params.UsingGlobalTypes == false)
-                        {
-                            WritePairFast("$type", Reflection.Instance.GetTypeAssemblyName(obj.GetType()));
-                        }
-                        else
-                        {
-                            int dt = 0;
-                            string ct = Reflection.Instance.GetTypeAssemblyName(obj.GetType());
-                            if (_globalTypes.TryGetValue(ct, out dt) == false)
-                            {
-                                dt = _globalTypes.Count + 1;
-                                _globalTypes.Add(ct, dt);
-                            }
-                            WritePairFast("$type", dt.ToString());
-                        }
-                    }
-                }
-                else
-                {
-                    var data = (textual).Value;
-                    _output.Append('"');
-                    _output.Append(data);
-                    _output.Append('"');
-                }
-            }
-            else
-            {
-
-                Dictionary<string, string> map = new Dictionary<string, string>();
+                var map = new Dictionary<string, string>();
                 Type t = obj.GetType();
                 bool append = false;
                 if (_params.UseExtensions)
@@ -438,13 +381,11 @@ namespace fastJSON
                     _output.Append(",\"$map\":");
                     WriteStringDictionary(map);
                 }
-            }
 
-            if (textual == null)
-            {
                 _current_depth--;
                 _output.Append('}');
             }
+
             _current_depth--;
         }
 
@@ -577,6 +518,91 @@ namespace fastJSON
             }
 
             _output.Append('\"');
+        }
+    }
+
+    internal sealed class CustomTarget : Serializer
+    {
+        private readonly StringBuilder _sb;
+        private readonly Action<object> _defer;
+        private Queue<Action> _actions = new Queue<Action>();
+
+        private bool? _isObject = null;
+
+        public CustomTarget(StringBuilder sb, Action<object> defer)
+        {
+            _sb = sb;
+            _defer = defer;
+        }
+
+        public void WriteValue(string value)
+        {
+            if (_isObject.HasValue) throw new InvalidOperationException("FASTJSON/CUSTOM ERROR 00A");
+            _isObject = false;
+            _actions.Enqueue(() =>
+            {
+                _sb.Append('"');
+                _sb.Append(value);
+                _sb.Append('"');
+            });
+        }
+
+        public void WriteField(string key, SerializerData field)
+        {
+            if (_isObject.HasValue && !_isObject.Value) throw new InvalidOperationException("FASTJSON/CUSTOM ERROR 00B");
+            _isObject = true;
+            _actions.Enqueue(() =>
+            {
+                _sb.Append('"');
+                _sb.Append(key);
+                _sb.Append('"');
+                _sb.Append(':');
+            });
+            _actions.Enqueue(field.Payload);
+        }
+
+        public void WriteList(IEnumerable<SerializerData> items)
+        {
+            if (_isObject.HasValue && _isObject.Value) throw new InvalidOperationException("FASTJSON/CUSTOM ERROR 00C");
+            _isObject = false;
+            _actions.Enqueue(() => _sb.Append('['));
+            foreach (var item in items) _actions.Enqueue(item.Payload);
+            _actions.Enqueue(() => _sb.Append(']'));
+        }
+
+        public void EmptyObject()
+        {
+            if (_isObject.HasValue && !_isObject.Value) throw new InvalidOperationException("FASTJSON/CUSTOM ERROR 00D");
+            _isObject = true;
+        }
+
+        public void Defer(SerializerData deferral)
+        {
+            if (_isObject.HasValue && _isObject.Value) throw new InvalidOperationException("FASTJSON/CUSTOM ERROR 00E");
+            _isObject = false;
+            _actions.Enqueue(deferral.Payload);
+        }
+
+        public SerializerData String(string s)
+        {
+            return new SerializerData(() =>
+            {
+                _sb.Append('"');
+                _sb.Append(s);
+                _sb.Append('"');
+            });
+        }
+
+        public SerializerData Defer(object o)
+        {
+            return new SerializerData(() => _defer(o));
+        }
+
+        public void WriteToTarget()
+        {
+            if (_isObject.HasValue && _isObject.Value) _sb.Append('{');
+            while (_actions.Count > 0) _actions.Dequeue()();
+            if (_isObject.HasValue && _isObject.Value) _sb.Append('}');
         }
     }
 }
