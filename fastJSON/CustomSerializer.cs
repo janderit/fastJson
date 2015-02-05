@@ -24,12 +24,12 @@ namespace fastJSON
     }
 
     public delegate void CustomSerialization(object t, Serializer output, Func<object, SerializerData> defer_back);
-    public delegate object CustomDeserialization_value(string json, Func<Type, object, object> deserializefields);
-    public delegate object CustomDeserialization_list(List<object> json, Func<Type, object, object> deserializefields);
-    public delegate object CustomDeserialization_dict(Dictionary<string, object> dict, Func<Type, object, object> deserializefields);
+    public delegate object CustomDeserialization_value(object json, Type targettype, Func<Type, object, object> defer_back);
+    public delegate object CustomDeserialization_list(List<object> json, Type targettype, Func<Type, object, object> defer_back);
+    public delegate object CustomDeserialization_dict(Dictionary<string, object> dict, Type targettype, Func<Type, object, object> defer_back);
 
     public delegate void CustomSerialization<in T>(T t, Serializer output, Func<object, SerializerData> defer_back);
-    public delegate T CustomDeserialization_value<out T>(string json, Func<Type, object, object> deserializefields);
-    public delegate T CustomDeserialization_list<out T>(List<object> json, Func<Type, object, object> deserializefields);
-    public delegate T CustomDeserialization_dict<out T>(Dictionary<string, object> dict, Func<Type, object, object> deserializefields);
+    public delegate T CustomDeserialization_value<out T>(object json, Type targettype, Func<Type, object, object> defer_back);
+    public delegate T CustomDeserialization_list<out T>(List<object> json, Type targettype, Func<Type, object, object> defer_back);
+    public delegate T CustomDeserialization_dict<out T>(Dictionary<string, object> dict, Type targettype, Func<Type, object, object> defer_back);
 }

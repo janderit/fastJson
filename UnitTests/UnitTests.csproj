@@ -58,6 +58,7 @@
     <Compile Include="JanderItIntegrationTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Regressions\Bug002.cs" />
+    <Compile Include="Regressions\Bug003.cs" />
     <Compile Include="Regressions\Optional.cs" />
     <Compile Include="Regressions\Zeit.cs" />
     <Compile Include="Tests.cs" />

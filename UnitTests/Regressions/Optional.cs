@@ -48,7 +48,7 @@ namespace UnitTests.Regressions.reftype
             Value = default(T);
         }*/
 
-        internal Optional(T t)
+        public Optional(T t)
             : this()
         {
             if ((object)t == null) return;

@@ -297,7 +297,7 @@ namespace fastJSON
                 custom(obj, target, target.Defer);
                 target.WriteToTarget();
             }
-            else if (_serializers.ContainsKey(obj.GetType().GetGenericTypeDefinition()))
+            else if (obj.GetType().IsGenericType && _serializers.ContainsKey(obj.GetType().GetGenericTypeDefinition()))
             {
                 var custom = _serializers[obj.GetType().GetGenericTypeDefinition()];
                 var target = new CustomTarget(_output, WriteValue);
