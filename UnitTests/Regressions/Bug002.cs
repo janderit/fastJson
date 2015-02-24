@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using fastJSON;
 using NUnit.Framework;
 
 namespace UnitTests.Regressions.reftype
@@ -7,28 +8,30 @@ namespace UnitTests.Regressions.reftype
     public class Bug002
     {
 
+        private readonly JSON _json = JSON.CreateInstance();
+
         [SetUp]
         public void SetFastJsonParameters()
         {
-            fastJSON.JSON.Instance.ClearCustom();
-            fastJSON.JSON.Instance.Parameters.EnableAnonymousTypes = false;
-            fastJSON.JSON.Instance.Parameters.IgnoreCaseOnDeserialize = false;
-            fastJSON.JSON.Instance.Parameters.SerializeNullValues = false;
-            fastJSON.JSON.Instance.Parameters.ShowReadOnlyProperties = false;
-            fastJSON.JSON.Instance.Parameters.UseExtensions = true;
-            fastJSON.JSON.Instance.Parameters.UseFastGuid = false;
-            fastJSON.JSON.Instance.Parameters.UseOptimizedDatasetSchema = false;
-            fastJSON.JSON.Instance.Parameters.UseUTCDateTime = false;
-            fastJSON.JSON.Instance.Parameters.UsingGlobalTypes = false;
+            _json.ClearCustom();
+            _json.Parameters.EnableAnonymousTypes = false;
+            _json.Parameters.IgnoreCaseOnDeserialize = false;
+            _json.Parameters.SerializeNullValues = false;
+            _json.Parameters.ShowReadOnlyProperties = false;
+            _json.Parameters.UseExtensions = true;
+            _json.Parameters.UseFastGuid = false;
+            _json.Parameters.UseOptimizedDatasetSchema = false;
+            _json.Parameters.UseUTCDateTime = false;
+            _json.Parameters.UsingGlobalTypes = false;
         }
 
         [Test]
         public void Test()
         {
             var payload = new OptContainer { Beginn = new Zeit(42) };
-            var json = fastJSON.JSON.Instance.ToJSON(payload);
+            var json = _json.ToJSON(payload);
             Trace.WriteLine(json);
-            var loaded = fastJSON.JSON.Instance.ToObject<OptContainer>(json);
+            var loaded = _json.ToObject<OptContainer>(json);
             Assert.IsTrue(loaded.Beginn.HasValue);
             Assert.AreEqual(42, loaded.Beginn.Value.Minuten);
         }

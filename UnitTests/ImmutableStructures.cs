@@ -11,27 +11,29 @@ namespace UnitTests
     public class ImmutableStructures
     {
 
+        private readonly JSON _json = JSON.CreateInstance();
+
         [SetUp]
         public void SetFastJsonParameters()
         {
-            fastJSON.JSON.Instance.Parameters.EnableAnonymousTypes = false;
-            fastJSON.JSON.Instance.Parameters.IgnoreCaseOnDeserialize = false;
-            fastJSON.JSON.Instance.Parameters.SerializeNullValues = false;
-            fastJSON.JSON.Instance.Parameters.ShowReadOnlyProperties = false;
-            fastJSON.JSON.Instance.Parameters.UseExtensions = false;
-            fastJSON.JSON.Instance.Parameters.UseFastGuid = false;
-            fastJSON.JSON.Instance.Parameters.UseOptimizedDatasetSchema = false;
-            fastJSON.JSON.Instance.Parameters.UseUTCDateTime = false;
-            fastJSON.JSON.Instance.Parameters.UsingGlobalTypes = false;
+            _json.Parameters.EnableAnonymousTypes = false;
+            _json.Parameters.IgnoreCaseOnDeserialize = false;
+            _json.Parameters.SerializeNullValues = false;
+            _json.Parameters.ShowReadOnlyProperties = false;
+            _json.Parameters.UseExtensions = false;
+            _json.Parameters.UseFastGuid = false;
+            _json.Parameters.UseOptimizedDatasetSchema = false;
+            _json.Parameters.UseUTCDateTime = false;
+            _json.Parameters.UsingGlobalTypes = false;
         }
 
         [Test]
         public void ValueObject()
         {
             var payload = new MyValueObject1("Hello", 42, Guid.NewGuid());
-            var json = fastJSON.JSON.Instance.ToJSON(payload);
+            var json = _json.ToJSON(payload);
             Trace.WriteLine(json);
-            var loaded = fastJSON.JSON.Instance.ToObject<MyValueObject1>(json);
+            var loaded = _json.ToObject<MyValueObject1>(json);
             Assert.AreEqual("Hello", loaded.A);
             Assert.AreEqual(42, loaded.B);
             Assert.AreEqual(payload.C, loaded.C);
@@ -41,9 +43,9 @@ namespace UnitTests
         public void ValueObjectWithinClass()
         {
             var payload = new Container {VO=new MyValueObject1("Hello", 42, Guid.NewGuid())};
-            var json = fastJSON.JSON.Instance.ToJSON(payload);
+            var json = _json.ToJSON(payload);
             Trace.WriteLine(json);
-            var loaded = fastJSON.JSON.Instance.ToObject<Container>(json);
+            var loaded = _json.ToObject<Container>(json);
             Assert.AreEqual("Hello", loaded.VO.A);
             Assert.AreEqual(42, loaded.VO.B);
             Assert.AreEqual(payload.VO.C, loaded.VO.C);

@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using NUnit.Framework;
 using fastJSON;
 
@@ -12,22 +8,25 @@ namespace UnitTests
     [TestFixture]
     class JanderItIntegrationTests
     {
-        
+
+        private readonly JSON _json = JSON.CreateInstance();
+
         [Test, ExpectedException]
         public void SingleThreadRoundTripNoExtensionsFailsWithoutType()
         {
             var o = new TestClassA { Id = Guid.NewGuid() , B=new TestClassB{SomeInt = 16}};
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             Assert.That(!json.Contains("$type"));
-            var p = fastJSON.JSON.Instance.ToObject(json) as TestClassA;
+            var p = _json.ToObject(json) as TestClassA;
+            Assert.NotNull(p);
         }
 
         [Test]
         public void EmptyClassSmokeTest()
         {
             var o = new EmptyClass();
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             Assert.AreEqual("{}", json);
         }
@@ -36,7 +35,7 @@ namespace UnitTests
         public void SimpleClassSmokeTest1()
         {
             var o = new SimpleClass1{Hello="World"};
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             Assert.AreEqual(@"{""Hello"":""World""}", json);
         }
@@ -45,7 +44,7 @@ namespace UnitTests
         public void SimpleClassSmokeTest2()
         {
             var o = new SimpleClass2 { Hello = "World" ,FourtyTwo= 42};
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             Assert.AreEqual(@"{""Hello"":""World"",""FourtyTwo"":42}", json);
         }
@@ -54,10 +53,10 @@ namespace UnitTests
         public void SingleThreadRoundTripNoExtensions()
         {
             var o = new TestClassA { Id = Guid.NewGuid(), B = new TestClassB { SomeInt = 16 } };
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             Assert.That(!json.Contains("$type"));
-            var p = fastJSON.JSON.Instance.ToObject(json, typeof(TestClassA)) as TestClassA;
+            var p = _json.ToObject(json, typeof(TestClassA)) as TestClassA;
             Assert.IsNotNull(p);
             Assert.AreEqual(o.Id, p.Id);
             Assert.AreEqual(o.B.SomeInt, p.B.SomeInt);
@@ -68,11 +67,11 @@ namespace UnitTests
         public void SingleThreadRoundTripExtensionsNoGlobals()
         {
             var o = new TestClassA { Id = Guid.NewGuid(), B = new TestClassB { SomeInt = 16 } };
-            var json = fastJSON.JSON.Instance.ToJSON(o, new JSONParameters{EnableAnonymousTypes=false, IgnoreCaseOnDeserialize=false, SerializeNullValues=false, ShowReadOnlyProperties=false, UseExtensions=true, UseFastGuid=false, UseOptimizedDatasetSchema=false, UseUTCDateTime=false, UsingGlobalTypes = false});
+            var json = _json.ToJSON(o, new JSONParameters{EnableAnonymousTypes=false, IgnoreCaseOnDeserialize=false, SerializeNullValues=false, ShowReadOnlyProperties=false, UseExtensions=true, UseFastGuid=false, UseOptimizedDatasetSchema=false, UseUTCDateTime=false, UsingGlobalTypes = false});
             Trace.WriteLine(json);
             Assert.That(json.Contains("$type"));
             Assert.That(!json.Contains("$types"));
-            var p = fastJSON.JSON.Instance.ToObject(json) as TestClassA;
+            var p = _json.ToObject(json) as TestClassA;
             Assert.IsNotNull(p);
             Assert.AreEqual(o.Id, p.Id);
             Assert.AreEqual(o.B.SomeInt, p.B.SomeInt);
@@ -82,11 +81,11 @@ namespace UnitTests
         public void SingleThreadRoundTripExtensionsWithGlobals()
         {
             var o = new TestClassA { Id = Guid.NewGuid(), B = new TestClassB { SomeInt = 16 } };
-            var json = JSON.Instance.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
+            var json = _json.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
             Trace.WriteLine(json);
             Assert.That(json.Contains("$type"));
             Assert.That(json.Contains("$types"));
-            var p = fastJSON.JSON.Instance.ToObject(json) as TestClassA;
+            var p = _json.ToObject(json) as TestClassA;
             Assert.IsNotNull(p);
             Assert.AreEqual(o.Id, p.Id);
             Assert.AreEqual(o.B.SomeInt, p.B.SomeInt);
@@ -95,15 +94,15 @@ namespace UnitTests
         [SetUp]
         public void SetFastJsonParameters()
         {
-            fastJSON.JSON.Instance.Parameters.EnableAnonymousTypes = false;
-            fastJSON.JSON.Instance.Parameters.IgnoreCaseOnDeserialize = false;
-            fastJSON.JSON.Instance.Parameters.SerializeNullValues = false;
-            fastJSON.JSON.Instance.Parameters.ShowReadOnlyProperties = false;
-            fastJSON.JSON.Instance.Parameters.UseExtensions = false;
-            fastJSON.JSON.Instance.Parameters.UseFastGuid = false;
-            fastJSON.JSON.Instance.Parameters.UseOptimizedDatasetSchema = false;
-            fastJSON.JSON.Instance.Parameters.UseUTCDateTime = false;
-            fastJSON.JSON.Instance.Parameters.UsingGlobalTypes = false;
+            _json.Parameters.EnableAnonymousTypes = false;
+            _json.Parameters.IgnoreCaseOnDeserialize = false;
+            _json.Parameters.SerializeNullValues = false;
+            _json.Parameters.ShowReadOnlyProperties = false;
+            _json.Parameters.UseExtensions = false;
+            _json.Parameters.UseFastGuid = false;
+            _json.Parameters.UseOptimizedDatasetSchema = false;
+            _json.Parameters.UseUTCDateTime = false;
+            _json.Parameters.UsingGlobalTypes = false;
         }
 
 
@@ -111,11 +110,11 @@ namespace UnitTests
         public void CanDeserializePolymorphicRootObjectsOnConcreteBaseClass()
         {
             var o = new Concrete4();
-            var json = JSON.Instance.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
+            var json = _json.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
             Trace.WriteLine(json);
             Assert.That(json.Contains("$type"));
             Assert.That(json.Contains("$types"));
-            var p = JSON.Instance.ToObject<ConcreteClass>(json);
+            var p = _json.ToObject<ConcreteClass>(json);
             Assert.IsNotNull(p);
             Assert.AreEqual("4", p.ToString());
         }
@@ -126,11 +125,11 @@ namespace UnitTests
             SetFastJsonParameters();
 
             var o = new Concrete2();
-            var json = JSON.Instance.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
+            var json = _json.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
             Trace.WriteLine(json);
             Assert.That(json.Contains("$type"));
             Assert.That(json.Contains("$types"));
-            var p = JSON.Instance.ToObject<AbstractClass>(json);
+            var p = _json.ToObject<AbstractClass>(json);
             Assert.IsNotNull(p);
             Assert.AreEqual("2", p.ToString());
         }
@@ -139,11 +138,11 @@ namespace UnitTests
         public void CanDeserializePolymorphicRootObjectsOnInterface()
         {
             var o = new Concrete1();
-            var json = JSON.Instance.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
+            var json = _json.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
             Trace.WriteLine(json);
             Assert.That(json.Contains("$type"));
             Assert.That(json.Contains("$types"));
-            var p = JSON.Instance.ToObject<MyInterface>(json);
+            var p = _json.ToObject<MyInterface>(json);
             Assert.IsNotNull(p);
             Assert.AreEqual("1", p.ToString());
         }
@@ -152,11 +151,11 @@ namespace UnitTests
         public void CanDeserializePolymorphicConstituentObjectsOnConcreteBaseClass()
         {
             var o = new ContainerConcrete {Payload = new Concrete3()};
-            var json = JSON.Instance.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
+            var json = _json.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
             Trace.WriteLine(json);
             Assert.That(json.Contains("$type"));
             Assert.That(json.Contains("$types"));
-            var p = JSON.Instance.ToObject<ContainerConcrete>(json);
+            var p = _json.ToObject<ContainerConcrete>(json);
             Assert.IsNotNull(p);
             Assert.IsNotNull(p.Payload);
             Assert.AreEqual("3", p.Payload.ToString());
@@ -166,11 +165,11 @@ namespace UnitTests
         public void CanDeserializePolymorphicConstituentObjectsOnAbstractBaseClass()
         {
             var o = new ContainerAbstract { Payload = new Concrete2() };
-            var json = JSON.Instance.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
+            var json = _json.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
             Trace.WriteLine(json);
             Assert.That(json.Contains("$type"));
             Assert.That(json.Contains("$types"));
-            var p = JSON.Instance.ToObject<ContainerAbstract>(json);
+            var p = _json.ToObject<ContainerAbstract>(json);
             Assert.IsNotNull(p);
             Assert.IsNotNull(p.Payload);
             Assert.AreEqual("2", p.Payload.ToString());
@@ -180,11 +179,11 @@ namespace UnitTests
         public void CanDeserializePolymorphicConstituentObjectsOnInterface()
         {
             var o = new ContainerInterface { Payload = new Concrete1() };
-            var json = JSON.Instance.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
+            var json = _json.ToJSON(o, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
             Trace.WriteLine(json);
             Assert.That(json.Contains("$type"));
             Assert.That(json.Contains("$types"));
-            var p = JSON.Instance.ToObject<ContainerInterface>(json);
+            var p = _json.ToObject<ContainerInterface>(json);
             Assert.IsNotNull(p);
             Assert.IsNotNull(p.Payload);
             Assert.AreEqual("1", p.Payload.ToString());
@@ -194,9 +193,9 @@ namespace UnitTests
         public void CorrectlyDeserializesDecimalValues()
         {
             var o = new DecimalContainer { Value = 16.06M };
-            var json = JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
-            var p = JSON.Instance.ToObject<DecimalContainer>(json);
+            var p = _json.ToObject<DecimalContainer>(json);
             Assert.IsNotNull(p);
             Assert.AreEqual(16.06M, p.Value);
         }
@@ -206,9 +205,9 @@ namespace UnitTests
         {
             var d = DateTime.Now;
             var o = new DateTimeContainer { Value = d };
-            var json = JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
-            var p = JSON.Instance.ToObject<DateTimeContainer>(json);
+            var p = _json.ToObject<DateTimeContainer>(json);
             Assert.IsNotNull(p);
             Assert.AreEqual(DateTimeKind.Unspecified, p.Value.Kind); // expect unspecified time
             Assert.AreEqual(d.ToString("yyyy-MM-dd HH:mm:ss"), p.Value.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -220,9 +219,9 @@ namespace UnitTests
             var now = DateTime.Now;
             var d = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0);
             var o = new DateTimeContainer { Value = d };
-            var json = JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
-            var p = JSON.Instance.ToObject<DateTimeContainer>(json);
+            var p = _json.ToObject<DateTimeContainer>(json);
             Assert.IsNotNull(p);
             Assert.AreEqual(DateTimeKind.Unspecified, p.Value.Kind); // expect unspecified time
             Assert.AreEqual(d.ToString("yyyy-MM-dd HH:mm:ss"), p.Value.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -233,9 +232,9 @@ namespace UnitTests
         {
             var d = DateTime.UtcNow;
             var o = new DateTimeContainer { Value = d };
-            var json = JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
-            var p = JSON.Instance.ToObject<DateTimeContainer>(json);
+            var p = _json.ToObject<DateTimeContainer>(json);
             Assert.IsNotNull(p);
             Assert.AreEqual(DateTimeKind.Utc, p.Value.Kind); // expect UTC
             Assert.AreEqual(d.ToString("yyyy-MM-dd HH:mm:ss"), p.Value.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -244,12 +243,12 @@ namespace UnitTests
         [Test]
         public void CorrectlyDeserializesUtcDateTimeValuesViaUtc()
         {
-            fastJSON.JSON.Instance.Parameters.UseUTCDateTime = true;
+            _json.Parameters.UseUTCDateTime = true;
             var d = DateTime.UtcNow;
             var o = new DateTimeContainer { Value = d };
-            var json = JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
-            var p = JSON.Instance.ToObject<DateTimeContainer>(json);
+            var p = _json.ToObject<DateTimeContainer>(json);
             Assert.IsNotNull(p);
             Assert.AreEqual(DateTimeKind.Utc, p.Value.Kind); // Expect UTC
             Assert.AreEqual(d.ToString("yyyy-MM-dd HH:mm:ss"), p.Value.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -258,12 +257,12 @@ namespace UnitTests
         [Test]
         public void CorrectlyDeserializesDateTimeValuesViaUtc()
         {
-            fastJSON.JSON.Instance.Parameters.UseUTCDateTime = true;
+            _json.Parameters.UseUTCDateTime = true;
             var d = DateTime.Now;
             var o = new DateTimeContainer { Value = d };
-            var json = JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
-            var p = JSON.Instance.ToObject<DateTimeContainer>(json);
+            var p = _json.ToObject<DateTimeContainer>(json);
             Assert.IsNotNull(p);
             Assert.AreEqual(DateTimeKind.Utc, p.Value.Kind); // Expect UTC
             Assert.AreEqual(d.ToString("yyyy-MM-dd HH:mm:ss"), p.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"));
@@ -272,13 +271,13 @@ namespace UnitTests
         [Test]
         public void CorrectlyDeserializesDateTimeValuesWithEmptyTimeViaUtc()
         {
-            fastJSON.JSON.Instance.Parameters.UseUTCDateTime = true;
+            _json.Parameters.UseUTCDateTime = true;
             var now = DateTime.Now;
             var d = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0);
             var o = new DateTimeContainer { Value = d };
-            var json = JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
-            var p = JSON.Instance.ToObject<DateTimeContainer>(json);
+            var p = _json.ToObject<DateTimeContainer>(json);
             Assert.IsNotNull(p);
             Assert.AreEqual(DateTimeKind.Utc, p.Value.Kind); // Expect UTC
             Assert.AreEqual(d.ToString("yyyy-MM-dd HH:mm:ss"), p.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"));

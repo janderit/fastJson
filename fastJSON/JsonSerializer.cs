@@ -6,7 +6,6 @@ using System.Data;
 #endif
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text;
 
 namespace fastJSON
@@ -15,23 +14,25 @@ namespace fastJSON
     {
         private StringBuilder _output = new StringBuilder();
         private StringBuilder _before = new StringBuilder();
-        readonly int _MAX_DEPTH = 10;
-        int _current_depth = 0;
-        private Dictionary<string, int> _globalTypes = new Dictionary<string, int>();
-        private JSONParameters _params;
+        private const int _MAX_DEPTH = 10;
+        int _current_depth;
+        private readonly Dictionary<string, int> _globalTypes = new Dictionary<string, int>();
+        private readonly JSONParameters _params;
         private readonly Dictionary<Type, CustomSerialization> _serializers;
-        
-        internal JSONSerializer(JSONParameters @params, Dictionary<Type, CustomSerialization> serializers)
+        private readonly Reflection _reflection;
+
+        internal JSONSerializer(JSONParameters @params, Dictionary<Type, CustomSerialization> serializers, Reflection reflection)
         {
             _params = @params;
             _serializers = serializers;
+            _reflection = reflection;
         }
 
         internal string ConvertToJSON(object obj)
         {
             WriteValue(obj);
 
-            string str = "";
+            string str;
             if (_params.UsingGlobalTypes && _globalTypes != null && _globalTypes.Count > 0)
             {
                 StringBuilder sb = _before;
@@ -48,7 +49,7 @@ namespace fastJSON
                     sb.Append("\"");
                 }
                 sb.Append("},");
-                sb.Append(_output.ToString());
+                sb.Append(_output);
                 str = sb.ToString();
             }
             else
@@ -104,22 +105,9 @@ namespace fastJSON
             else if (obj is Enum)
                 WriteEnum((Enum)obj);
 
-#if CUSTOMTYPE
-            else if (JSON.Instance.IsTypeRegistered(obj.GetType()))
-                WriteCustom(obj);
-#endif
             else
                 WriteObject(obj);
         }
-
-#if CUSTOMTYPE
-        private void WriteCustom(object obj)
-        {
-            Serialize s;
-            JSON.Instance._customSerializer.TryGetValue(obj.GetType(), out s);
-            WriteStringFast(s(obj));
-        }
-#endif
 
         private void WriteEnum(Enum e)
         {
@@ -175,9 +163,7 @@ namespace fastJSON
         {
             if (ds == null) return null;
 
-            DatasetSchema m = new DatasetSchema();
-            m.Info = new List<string>();
-            m.Name = ds.TableName;
+            var m = new DatasetSchema {Info = new List<string>(), Name = ds.TableName};
 
             foreach (DataColumn c in ds.Columns)
             {
@@ -194,9 +180,7 @@ namespace fastJSON
         {
             if (ds == null) return null;
 
-            DatasetSchema m = new DatasetSchema();
-            m.Info = new List<string>();
-            m.Name = ds.DataSetName;
+            var m = new DatasetSchema {Info = new List<string>(), Name = ds.DataSetName};
 
             foreach (DataTable t in ds.Tables)
             {
@@ -282,7 +266,7 @@ namespace fastJSON
         }
 #endif
 
-        bool _TypesWritten = false;
+        bool _TypesWritten;
 
         
 
@@ -332,25 +316,25 @@ namespace fastJSON
                 {
                     if (_params.UsingGlobalTypes == false)
                     {
-                        WritePairFast("$type", Reflection.Instance.GetTypeAssemblyName(t));
+                        WritePairFast("$type", _reflection.GetTypeAssemblyName(t));
                         typesnonempty = true;
                     }
                     else
                     {
-                        int dt = 0;
-                        string ct = Reflection.Instance.GetTypeAssemblyName(t);
+                        int dt;
+                        string ct = _reflection.GetTypeAssemblyName(t);
                         if (_globalTypes.TryGetValue(ct, out dt) == false)
                         {
                             dt = _globalTypes.Count + 1;
                             _globalTypes.Add(ct, dt);
                         }
-                        WritePairFast("$type", dt.ToString());
+                        WritePairFast("$type", dt.ToString(CultureInfo.InvariantCulture));
                         typesnonempty = true;
                     }
                     append = true;
                 }
 
-                List<Getters> g = Reflection.Instance.GetGetters(t);
+                List<Getters> g = _reflection.GetGetters(t);
                 int gc = g.Count;
                 int i = g.Count;
                 foreach (var p in g)
@@ -368,7 +352,7 @@ namespace fastJSON
                         if (o != null && _params.UseExtensions)
                         {
                             Type tt = o.GetType();
-                            if (tt == typeof (System.Object))
+                            if (tt == typeof (Object))
                                 map.Add(p.Name, tt.ToString());
                         }
                         append = true;
@@ -525,9 +509,9 @@ namespace fastJSON
     {
         private readonly StringBuilder _sb;
         private readonly Action<object> _defer;
-        private Queue<Action> _actions = new Queue<Action>();
+        private readonly Queue<Action> _actions = new Queue<Action>();
 
-        private bool? _isObject = null;
+        private bool? _isObject;
 
         public CustomTarget(StringBuilder sb, Action<object> defer)
         {

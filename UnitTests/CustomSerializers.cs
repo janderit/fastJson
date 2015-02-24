@@ -13,26 +13,28 @@ namespace UnitTests
     public class CustomSerializers
     {
 
+        private readonly JSON _json = JSON.CreateInstance();
+
         [SetUp]
         public void SetFastJsonParameters()
         {
-            fastJSON.JSON.Instance.Parameters.EnableAnonymousTypes = false;
-            fastJSON.JSON.Instance.Parameters.IgnoreCaseOnDeserialize = false;
-            fastJSON.JSON.Instance.Parameters.SerializeNullValues = false;
-            fastJSON.JSON.Instance.Parameters.ShowReadOnlyProperties = false;
-            fastJSON.JSON.Instance.Parameters.UseExtensions = false;
-            fastJSON.JSON.Instance.Parameters.UseFastGuid = false;
-            fastJSON.JSON.Instance.Parameters.UseOptimizedDatasetSchema = false;
-            fastJSON.JSON.Instance.Parameters.UseUTCDateTime = false;
-            fastJSON.JSON.Instance.Parameters.UsingGlobalTypes = false;
+            _json.Parameters.EnableAnonymousTypes = false;
+            _json.Parameters.IgnoreCaseOnDeserialize = false;
+            _json.Parameters.SerializeNullValues = false;
+            _json.Parameters.ShowReadOnlyProperties = false;
+            _json.Parameters.UseExtensions = false;
+            _json.Parameters.UseFastGuid = false;
+            _json.Parameters.UseOptimizedDatasetSchema = false;
+            _json.Parameters.UseUTCDateTime = false;
+            _json.Parameters.UsingGlobalTypes = false;
         }
 
         [Test]
         public void CustomSerializerSmokeTest1()
         {
             var o = new SimpleClass3 { Hello = "World" };
-            fastJSON.JSON.Instance.RegisterCustomSerializer<SimpleClass3>((t, s, d) => s.WriteField("Hello", d("Earth")));
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            _json.RegisterCustomSerializer<SimpleClass3>((t, s, d) => s.WriteField("Hello", d("Earth")));
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             Assert.AreEqual(@"{""Hello"":""Earth""}", json);
         }
@@ -40,24 +42,24 @@ namespace UnitTests
         [Test]
         public void CustomDeserializerSmokeTest1()
         {
-            fastJSON.JSON.Instance.RegisterCustomDeserializer_d((j,t, d) => new SimpleClass3 {Hello = "Moon"});
-            var o = fastJSON.JSON.Instance.ToObject<SimpleClass3>("{\"Hello\":\"Phobos\"}");
+            _json.RegisterCustomDeserializer_d((j,t, d) => new SimpleClass3 {Hello = "Moon"});
+            var o = _json.ToObject<SimpleClass3>("{\"Hello\":\"Phobos\"}");
             Assert.AreEqual("Moon", o.Hello);
         }
 
         [Test]
         public void CustomDeserializerSmokeTest2()
         {
-            fastJSON.JSON.Instance.RegisterCustomDeserializer_l((j, t, d) => new SimpleClass3 { Hello = "Moon" });
-            var o = fastJSON.JSON.Instance.ToObject<SimpleClass3>("[\"Phobos\"]");
+            _json.RegisterCustomDeserializer_l((j, t, d) => new SimpleClass3 { Hello = "Moon" });
+            var o = _json.ToObject<SimpleClass3>("[\"Phobos\"]");
             Assert.AreEqual("Moon", o.Hello);
         }
 
         [Test]
         public void CustomDeserializerSmokeTest3()
         {
-            fastJSON.JSON.Instance.RegisterCustomDeserializer_v((j, t, d) => new SimpleClass3 { Hello = "Moon" });
-            var o = fastJSON.JSON.Instance.ToObject<SimpleClass3>("\"Phobos\"");
+            _json.RegisterCustomDeserializer_v((j, t, d) => new SimpleClass3 { Hello = "Moon" });
+            var o = _json.ToObject<SimpleClass3>("\"Phobos\"");
             Assert.AreEqual("Moon", o.Hello);
         }
 
@@ -65,13 +67,13 @@ namespace UnitTests
         public void CustomSerializerOption_empty()
         {
             var o = new Optional<int>();
-            fastJSON.JSON.Instance.RegisterCustomSerializer(typeof(Optional<>), (v, s, d) =>
+            _json.RegisterCustomSerializer(typeof(Optional<>), (v, s, d) =>
             {
                 var boxed = (v as OptionalBox).BOX();
                 if (boxed.HasValue) s.Defer(d(boxed.Value));
                 else s.EmptyObject();
             });
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             Assert.AreEqual("{}", json);
         }
@@ -81,14 +83,14 @@ namespace UnitTests
         {
             var o = new Optional<int>(42);
 
-            fastJSON.JSON.Instance.RegisterCustomSerializer(typeof(Optional<>), (v, s, d) =>
+            _json.RegisterCustomSerializer(typeof(Optional<>), (v, s, d) =>
             {
                 var boxed = (v as OptionalBox).BOX();
                 if (boxed.HasValue) s.Defer(d(boxed.Value));
                 else s.EmptyObject();
             });
 
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             Assert.AreEqual("42", json);
         }
@@ -96,10 +98,10 @@ namespace UnitTests
         [Test]
         public void CustomSerializerOption_valuetype_deserialize()
         {
-            fastJSON.JSON.Instance.RegisterCustomDeserializer_d(typeof(Optional<>), (dico, t, defer) => Activator.CreateInstance(t));
-            fastJSON.JSON.Instance.RegisterCustomDeserializer_v(typeof(Optional<>), (v, t, defer) => Activator.CreateInstance(t, new[] { Convert.ChangeType(defer(t.GetGenericArguments().Single(), v), t.GetGenericArguments().Single()) }));
+            _json.RegisterCustomDeserializer_d(typeof(Optional<>), (dico, t, defer) => Activator.CreateInstance(t));
+            _json.RegisterCustomDeserializer_v(typeof(Optional<>), (v, t, defer) => Activator.CreateInstance(t, new[] { Convert.ChangeType(defer(t.GetGenericArguments().Single(), v), t.GetGenericArguments().Single()) }));
 
-            var o = fastJSON.JSON.Instance.ToObject<Optional<int>>("42");
+            var o = _json.ToObject<Optional<int>>("42");
             Trace.WriteLine(o);
             Assert.IsTrue(o.HasValue);
             Assert.AreEqual(42, o.Value);
@@ -108,10 +110,10 @@ namespace UnitTests
         [Test]
         public void CustomSerializerOption_none_deserialize()
         {
-            fastJSON.JSON.Instance.RegisterCustomDeserializer_d(typeof(Optional<>), (dico, t, defer) => Activator.CreateInstance(t));
-            fastJSON.JSON.Instance.RegisterCustomDeserializer_v(typeof(Optional<>), (v, t, defer) => Activator.CreateInstance(t, new[] { Convert.ChangeType(defer(t.GetGenericArguments().Single(), v), t.GetGenericArguments().Single()) }));
+            _json.RegisterCustomDeserializer_d(typeof(Optional<>), (dico, t, defer) => Activator.CreateInstance(t));
+            _json.RegisterCustomDeserializer_v(typeof(Optional<>), (v, t, defer) => Activator.CreateInstance(t, new[] { Convert.ChangeType(defer(t.GetGenericArguments().Single(), v), t.GetGenericArguments().Single()) }));
 
-            var o = fastJSON.JSON.Instance.ToObject<Optional<int>>("{}");
+            var o = _json.ToObject<Optional<int>>("{}");
             Trace.WriteLine(o);
             Assert.IsFalse(o.HasValue);
         }
@@ -119,14 +121,14 @@ namespace UnitTests
         [Test]
         public void FastGuid()
         {
-            fastJSON.JSON.Instance.Parameters.UseFastGuid = true;
-            fastJSON.JSON.Instance.RegisterCustomDeserializer_d(typeof(Optional<>), (dico, t, defer) => Activator.CreateInstance(t));
-            fastJSON.JSON.Instance.RegisterCustomDeserializer_v(typeof(Optional<>), (v, t, defer) => Activator.CreateInstance(t, new[] { Convert.ChangeType(defer(t.GetGenericArguments().Single(), v), t.GetGenericArguments().Single()) }));
+            _json.Parameters.UseFastGuid = true;
+            _json.RegisterCustomDeserializer_d(typeof(Optional<>), (dico, t, defer) => Activator.CreateInstance(t));
+            _json.RegisterCustomDeserializer_v(typeof(Optional<>), (v, t, defer) => Activator.CreateInstance(t, new[] { Convert.ChangeType(defer(t.GetGenericArguments().Single(), v), t.GetGenericArguments().Single()) }));
             var id = Guid.NewGuid();
             var payload = new OptContainer1 { Id = id };
-            var json = fastJSON.JSON.Instance.ToJSON(payload);
+            var json = _json.ToJSON(payload);
             Trace.WriteLine(json);
-            var loaded = fastJSON.JSON.Instance.ToObject<OptContainer1>(json);
+            var loaded = _json.ToObject<OptContainer1>(json);
             Assert.IsTrue(loaded.Id.HasValue);
             Assert.AreEqual(id, loaded.Id.Value);
         }
@@ -134,11 +136,11 @@ namespace UnitTests
         /*[Test]
         public void CustomDeserializerWithTypeInfo()
         {
-            fastJSON.JSON.Instance.Parameters.UseExtensions = true;
+            _json.Parameters.UseExtensions = true;
             var o = new SimpleClass3 { Hello = "World" };
-            fastJSON.JSON.Instance.RegisterCustomSerializer<SimpleClass3>(new SimpleClass3Serializer());
-            var json = fastJSON.JSON.Instance.ToJSON(o);
-            var o2 = fastJSON.JSON.Instance.ToObject(json) as SimpleClass3;
+            _json.RegisterCustomSerializer<SimpleClass3>(new SimpleClass3Serializer());
+            var json = _json.ToJSON(o);
+            var o2 = _json.ToObject(json) as SimpleClass3;
             Assert.IsNotNull(o2);
             Assert.AreEqual("Moon", o2.Hello);
         }*/
@@ -146,12 +148,12 @@ namespace UnitTests
         /*[Test]
         public void CustomDeserializerWithTypeInfoAndGlobalTypes()
         {
-            fastJSON.JSON.Instance.Parameters.UseExtensions = true;
-            fastJSON.JSON.Instance.Parameters.UsingGlobalTypes = true;
+            _json.Parameters.UseExtensions = true;
+            _json.Parameters.UsingGlobalTypes = true;
             var o = new SimpleClass3 { Hello = "World" };
-            fastJSON.JSON.Instance.RegisterCustomSerializer<SimpleClass3>(new SimpleClass3Serializer());
-            var json = fastJSON.JSON.Instance.ToJSON(o);
-            var o2 = fastJSON.JSON.Instance.ToObject(json) as SimpleClass3;
+            _json.RegisterCustomSerializer<SimpleClass3>(new SimpleClass3Serializer());
+            var json = _json.ToJSON(o);
+            var o2 = _json.ToObject(json) as SimpleClass3;
             Assert.IsNotNull(o2);
             Assert.AreEqual("Moon", o2.Hello);
         }*/
@@ -160,8 +162,8 @@ namespace UnitTests
         public void CustomSerializerWithInner()
         {
             var o = new SimpleClass4 { Hello = "World", Inner = new InnerClass{Datum="Heute", Id=Guid.NewGuid()}};
-            fastJSON.JSON.Instance.RegisterCustomSerializer<SimpleClass4>(new SimpleClass4Serializer());
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            _json.RegisterCustomSerializer<SimpleClass4>(new SimpleClass4Serializer());
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             var o2 = JSON.Instance.ToObject<SimpleClass4>(json);
             Assert.IsNotNull(o2);
@@ -175,8 +177,8 @@ namespace UnitTests
         public void CustomSerializerWithinOuter()
         {
             var o = new SimpleClass5 {Inner = new SimpleClass3() {Hello = "Test"}};
-            fastJSON.JSON.Instance.RegisterCustomSerializer<SimpleClass3>(new SimpleClass3Serializer());
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            _json.RegisterCustomSerializer<SimpleClass3>(new SimpleClass3Serializer());
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             var o2 = JSON.Instance.ToObject<SimpleClass5>(json);
             Assert.IsNotNull(o2);
@@ -188,13 +190,13 @@ namespace UnitTests
         public void CustomSerializerWithTextRepresentation()
         {
             var o = new SimpleClass4 { Hello = "World", Inner = new InnerClass { Datum = "Heute", Id = Guid.NewGuid() } };
-            fastJSON.JSON.Instance.RegisterCustomSerializer<SimpleClass4>(new SimpleClass4Serializer());
-            fastJSON.JSON.Instance.RegisterCustomSerializer<InnerClass>((i,d)=>i.Datum+"|"+i.Id, (line, defer) =>
+            _json.RegisterCustomSerializer<SimpleClass4>(new SimpleClass4Serializer());
+            _json.RegisterCustomSerializer<InnerClass>((i,d)=>i.Datum+"|"+i.Id, (line, defer) =>
             {
                 var parts = line.Split('|');
                 return new InnerClass {Datum = parts[0], Id = Guid.Parse(parts[1])};
             });
-            var json = fastJSON.JSON.Instance.ToJSON(o);
+            var json = _json.ToJSON(o);
             Trace.WriteLine(json);
             var o2 = JSON.Instance.ToObject<SimpleClass4>(json);
             Assert.IsNotNull(o2);

@@ -9,21 +9,22 @@ namespace UnitTests
     [TestFixture]
     internal class Concurrency_bug_in_2_0_5
     {
+        private readonly JSON _json = JSON.CreateInstance();
 
-        private static void GenerateJsonForAandB(out string jsonA, out string jsonB)
+        private void GenerateJsonForAandB(out string jsonA, out string jsonB)
         {
             Trace.WriteLine("Begin constructing the original objects. Please ignore trace information until I'm done.");
 
             // set all parameters to false to produce pure JSON
-            fastJSON.JSON.Instance.Parameters = new JSONParameters {EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = false, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = false};
+            _json.Parameters = new JSONParameters {EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = false, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = false};
 
             var a = new ConcurrentClassA {PayloadA = new PayloadA()};
             var b = new ConcurrentClassB {PayloadB = new PayloadB()};
 
             // A is serialized with extensions and global types
-            jsonA = JSON.Instance.ToJSON(a, new JSONParameters {EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true});
+            jsonA = _json.ToJSON(a, new JSONParameters { EnableAnonymousTypes = false, IgnoreCaseOnDeserialize = false, SerializeNullValues = false, ShowReadOnlyProperties = false, UseExtensions = true, UseFastGuid = false, UseOptimizedDatasetSchema = false, UseUTCDateTime = false, UsingGlobalTypes = true });
             // B is serialized using the above defaults
-            jsonB = JSON.Instance.ToJSON(b);
+            jsonB = _json.ToJSON(b);
 
             Trace.WriteLine("Ok, I'm done constructing the objects. Below is the generated json. Trace messages that follow below are the result of deserialization and critical for understanding the timing.");
             Trace.WriteLine(jsonA);
@@ -37,8 +38,8 @@ namespace UnitTests
             string jsonB;
             GenerateJsonForAandB(out jsonA, out jsonB);
 
-            var ax = JSON.Instance.ToObject(jsonA); // A has type information in JSON-extended
-            var bx = JSON.Instance.ToObject<ConcurrentClassB>(jsonB); // B needs external type info
+            var ax = _json.ToObject(jsonA); // A has type information in JSON-extended
+            var bx = _json.ToObject<ConcurrentClassB>(jsonB); // B needs external type info
 
             Assert.IsNotNull(ax);
             Assert.IsInstanceOf<ConcurrentClassA>(ax);
@@ -71,7 +72,7 @@ namespace UnitTests
                                             try
                                             {
                                                 Trace.WriteLine(Thread.CurrentThread.ManagedThreadId + " A begins deserialization");
-                                                ax = JSON.Instance.ToObject(jsonA); // A has type information in JSON-extended
+                                                ax = _json.ToObject(jsonA); // A has type information in JSON-extended
                                                 Trace.WriteLine(Thread.CurrentThread.ManagedThreadId + " A is done");
                                             }
                                             catch (Exception ex)
@@ -85,7 +86,7 @@ namespace UnitTests
             Thread.Sleep(500); // wait to allow A to begin deserialization first
 
             Trace.WriteLine(Thread.CurrentThread.ManagedThreadId + " B begins deserialization");
-            bx=JSON.Instance.ToObject<ConcurrentClassB>(jsonB); // B needs external type info
+            bx = _json.ToObject<ConcurrentClassB>(jsonB); // B needs external type info
             Trace.WriteLine(Thread.CurrentThread.ManagedThreadId + " B is done");
 
             Trace.WriteLine(Thread.CurrentThread.ManagedThreadId + " waiting for A to continue");

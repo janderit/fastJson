@@ -5,6 +5,7 @@ using System.Data;
 using System.IO;
 using System.Reflection;
 using System.Runtime.Serialization.Formatters.Binary;
+using fastJSON;
 
 namespace consoletest
 {
@@ -177,11 +178,13 @@ namespace consoletest
                 colclass deserializedStore;
                 string jsonText = null;
 
-                jsonText = fastJSON.JSON.Instance.ToJSON(c);
+                var json_sd = JSON.CreateInstance();
+
+                jsonText = json_sd.ToJSON(c);
                 //Console.WriteLine(" size = " + jsonText.Length);
                 for (int i = 0; i < count; i++)
                 {
-                    deserializedStore = (colclass)fastJSON.JSON.Instance.ToObject(jsonText);
+                    deserializedStore = (colclass)json_sd.ToObject(jsonText);
                 }
                 Console.Write("\t" + DateTime.Now.Subtract(st).TotalMilliseconds);
             }
@@ -192,13 +195,14 @@ namespace consoletest
             Console.WriteLine();
             Console.Write("fastjson serialize");
             colclass c = CreateObject();
+            var json_sd = JSON.CreateInstance();
             for (int pp = 0; pp < tcount; pp++)
             {
                 DateTime st = DateTime.Now;
                 string jsonText = null;
                 for (int i = 0; i < count; i++)
                 {
-                    jsonText = fastJSON.JSON.Instance.ToJSON(c);
+                    jsonText = json_sd.ToJSON(c);
                 }
                 Console.Write("\t" + DateTime.Now.Subtract(st).TotalMilliseconds);
             }

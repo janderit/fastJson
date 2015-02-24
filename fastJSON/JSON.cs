@@ -8,8 +8,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
-using System.Text;
 using System.Threading;
 
 namespace fastJSON
@@ -67,17 +65,13 @@ namespace fastJSON
 
     public sealed class JSON
     {
-        [ThreadStatic]
-        private static JSON _instance;
 
-        public static JSON Instance
+        public static JSON CreateInstance()
         {
-            get
-            {
-                if (_instance == null) _instance = new JSON();
-                return _instance;
-            }
+            return new JSON();
         }
+
+        private readonly Reflection _reflection = new Reflection();
 
         private JSON()
         {
@@ -85,19 +79,14 @@ namespace fastJSON
         /// <summary>
         /// You can set these paramters globally for all calls
         /// </summary>
-        private static JSONParameters _globalParameters = new JSONParameters();
+        private JSONParameters _parameters = new JSONParameters();
 
-        /// <summary>
-        /// You can set these paramters globally for all calls. This is provided for backwards compatibility and access the public static JSON.GlobalParameters property.
-        /// </summary>
-        public JSONParameters Parameters { get { return GlobalParameters; } set { GlobalParameters = value; } }
-
-        private static readonly ReaderWriterLockSlim Lock = new ReaderWriterLockSlim();
+        private readonly ReaderWriterLockSlim Lock = new ReaderWriterLockSlim();
 
         /// <summary>
         /// You can set these paramters globally for all calls. Thread safe.
         /// </summary>
-        public static JSONParameters GlobalParameters
+        public JSONParameters Parameters
         {
             get
             {
@@ -106,17 +95,15 @@ namespace fastJSON
 
                     try
                     {
-                        return _globalParameters;
+                        return _parameters;
                     }
                     finally
                     {
                         Lock.ExitReadLock();
                     }
                 }
-                else
-                {
-                    throw new Exception("Unable to obtain read lock for fastJSON global parameters");
-                }
+                
+                throw new Exception("Unable to obtain read lock for fastJSON parameters");
             }
             set
             {
@@ -124,14 +111,14 @@ namespace fastJSON
                 {
                     try
                     {
-                        _globalParameters = value;
+                        _parameters = value;
                     }
                     finally
                     {
                         Lock.ExitWriteLock();
                     }
                 }
-                else throw new Exception("Unable to obtain write lock for fastJSON global parameters");
+                else throw new Exception("Unable to obtain write lock for fastJSON parameters");
             }
         }
 
@@ -141,7 +128,7 @@ namespace fastJSON
         {
             _params = Parameters;
             _params.FixValues();
-            Reflection.Instance.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
+            _reflection.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
             return ToJSON(obj, Parameters);
         }
 
@@ -149,7 +136,7 @@ namespace fastJSON
         {
             _params = param;
             _params.FixValues();
-            Reflection.Instance.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
+            _reflection.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
             Type t = null;
 
             if (obj == null)
@@ -161,15 +148,14 @@ namespace fastJSON
                 _params.UsingGlobalTypes = false;
 
             // FEATURE : enable extensions when you can deserialize anon types
-            if (_params.EnableAnonymousTypes) { _params.UseExtensions = false; _params.UsingGlobalTypes = false; Reflection.Instance.ShowReadOnlyProperties = true; }
-            _usingglobals = _params.UsingGlobalTypes;
-            return new JSONSerializer(_params, _serializers).ConvertToJSON(obj);
+            if (_params.EnableAnonymousTypes) { _params.UseExtensions = false; _params.UsingGlobalTypes = false; _reflection.ShowReadOnlyProperties = true; }
+            return new JSONSerializer(_params, _serializers, _reflection).ConvertToJSON(obj);
         }
 
         public object Parse(string json)
         {
             _params = Parameters;
-            Reflection.Instance.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
+            _reflection.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
             return new JsonParser(json, _params.IgnoreCaseOnDeserialize).Decode();
         }
 
@@ -187,7 +173,7 @@ namespace fastJSON
         {
             _params = Parameters;
             _params.FixValues();
-            Reflection.Instance.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
+            _reflection.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
             Type t = null;
 
             if (type != null && type.IsGenericType)
@@ -195,42 +181,42 @@ namespace fastJSON
             if (t == typeof(Dictionary<,>) || t == typeof(List<>))
                 _params.UsingGlobalTypes = false;
 
-            _usingglobals = _params.UsingGlobalTypes;
+            var usingglobals = _params.UsingGlobalTypes;
 
             object o = new JsonParser(json, Parameters.IgnoreCaseOnDeserialize).Decode();
 
-            return DecodeParsed(type, null, o);
+            return DecodeParsed(type, null, o, usingglobals);
         }
 
-        private object DecodeParsed(Type type, Dictionary<string, object> globaltypes, object o)
+        private object DecodeParsed(Type type, Dictionary<string, object> globaltypes, object o, bool usingglobals)
         {
             if (o is IDictionary)
             {
-                if (type != null && _deserializers_dict.ContainsKey(type)) return _deserializers_dict[type](o as Dictionary<string, object>, type, (t, x) => ChangeType(DecodeParsed(t, globaltypes,x), t, globaltypes));
+                if (type != null && _deserializers_dict.ContainsKey(type)) return _deserializers_dict[type](o as Dictionary<string, object>, type, (t, x) => ChangeType(DecodeParsed(t, globaltypes,x,usingglobals), t, globaltypes, usingglobals));
 
                 if (type != null && type.IsGenericType && type.GetGenericTypeDefinition() == typeof (Dictionary<,>))
                     // deserialize a dictionary
-                    return RootDictionary(o, type, globaltypes);
-                else // deserialize an object
-                    return ParseDictionary(o as Dictionary<string, object>, globaltypes, type, null);
+                    return RootDictionary(o, type, globaltypes, usingglobals);
+                
+                return ParseDictionary(o as Dictionary<string, object>, globaltypes, type, null, usingglobals);
             }
 
             if (o is List<object>)
             {
-                if (type != null && _deserializers_list.ContainsKey(type)) return _deserializers_list[type](o as List<object>, type, (t, x) => ChangeType(DecodeParsed(t,globaltypes, x), t, globaltypes));
+                if (type != null && _deserializers_list.ContainsKey(type)) return _deserializers_list[type](o as List<object>, type, (t, x) => ChangeType(DecodeParsed(t,globaltypes, x,usingglobals), t, globaltypes, usingglobals));
 
                 if (type != null && type.GetGenericTypeDefinition() == typeof (Dictionary<,>)) // kv format
-                    return RootDictionary(o, type, globaltypes);
+                    return RootDictionary(o, type, globaltypes, usingglobals);
 
                 if (type != null && type.GetGenericTypeDefinition() == typeof (List<>)) // deserialize to generic list
                     return RootList(o, type, globaltypes);
-                else
-                    return (o as List<object>).ToArray();
+                
+                return (o as List<object>).ToArray();
             }
 
-            if (o is string && type != null && _deserializers_value.ContainsKey(type)) return _deserializers_value[type]((string)o, type, (t, x) => ChangeType(DecodeParsed(t,globaltypes, x), t, globaltypes));
+            if (o is string && type != null && _deserializers_value.ContainsKey(type)) return _deserializers_value[type](o, type, (t, x) => ChangeType(DecodeParsed(t,globaltypes, x,usingglobals), t, globaltypes, usingglobals));
 
-            if (type != null && type.IsGenericType && _deserializers_value.ContainsKey(type.GetGenericTypeDefinition())) return _deserializers_value[type.GetGenericTypeDefinition()](o, type, (t, x) => ChangeType(DecodeParsed(t,globaltypes, x), t, globaltypes));
+            if (type != null && type.IsGenericType && _deserializers_value.ContainsKey(type.GetGenericTypeDefinition())) return _deserializers_value[type.GetGenericTypeDefinition()](o, type, (t, x) => ChangeType(DecodeParsed(t,globaltypes, x,usingglobals), t, globaltypes, usingglobals));
 
             return o;
         }
@@ -244,10 +230,10 @@ namespace fastJSON
         {
             _params = Parameters;
             _params.FixValues();
-            Reflection.Instance.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
+            _reflection.ShowReadOnlyProperties = _params.ShowReadOnlyProperties;
             var ht = new JsonParser(json, Parameters.IgnoreCaseOnDeserialize).Decode() as Dictionary<string, object>;
             if (ht == null) return null;
-            return ParseDictionary(ht, null, input.GetType(), input);
+            return ParseDictionary(ht, null, input.GetType(), input, _parameters.UsingGlobalTypes);
         }
 
         public object DeepCopy(object obj)
@@ -292,54 +278,47 @@ namespace fastJSON
             public bool isInterface;
             public Reflection.GenericGetter getter;
             public bool isStringDictionary;
-            public string Name;
-#if CUSTOMTYPE
-            public bool isCustomType;
-#endif
             public bool CanWrite;
         }
 
-        SafeDictionary<string, SafeDictionary<string, myPropInfo>> _propertycache = new SafeDictionary<string, SafeDictionary<string, myPropInfo>>();
+        readonly SafeDictionary<string, SafeDictionary<string, myPropInfo>> _propertycache = new SafeDictionary<string, SafeDictionary<string, myPropInfo>>();
         private SafeDictionary<string, myPropInfo> Getproperties(Type type, string typename)
         {
-            SafeDictionary<string, myPropInfo> sd = null;
+            SafeDictionary<string, myPropInfo> sd;
             if (_propertycache.TryGetValue(typename, out sd))
             {
                 return sd;
             }
-            else
+            
+            sd = new SafeDictionary<string, myPropInfo>();
+            var pr = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            foreach (var p in pr)
             {
-                sd = new SafeDictionary<string, myPropInfo>();
-                PropertyInfo[] pr = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-                foreach (PropertyInfo p in pr)
-                {
-                    myPropInfo d = CreateMyProp(p.PropertyType, p.Name);
-                    d.CanWrite = p.CanWrite;
-                    d.setter = Reflection.CreateSetMethod(type, p);
-                    d.getter = Reflection.CreateGetMethod(type, p);
-                    sd.Add(p.Name, d);
-                }
-                FieldInfo[] fi = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
-                foreach (FieldInfo f in fi)
-                {
-                    myPropInfo d = CreateMyProp(f.FieldType, f.Name);
-                    d.setter = Reflection.CreateSetField(type, f);
-                    d.getter = Reflection.CreateGetField(type, f);
-                    sd.Add(f.Name, d);
-                }
-
-                _propertycache.Add(typename, sd);
-                return sd;
+                myPropInfo d = CreateMyProp(p.PropertyType);
+                d.CanWrite = p.CanWrite;
+                d.setter = Reflection.CreateSetMethod(type, p);
+                d.getter = Reflection.CreateGetMethod(type, p);
+                sd.Add(p.Name, d);
             }
+            var fi = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
+            foreach (var f in fi)
+            {
+                myPropInfo d = CreateMyProp(f.FieldType);
+                d.setter = Reflection.CreateSetField(type, f);
+                d.getter = Reflection.CreateGetField(type, f);
+                sd.Add(f.Name, d);
+            }
+
+            _propertycache.Add(typename, sd);
+            return sd;
         }
 
-        private myPropInfo CreateMyProp(Type t, string name)
+        private myPropInfo CreateMyProp(Type t)
         {
-            myPropInfo d = new myPropInfo();
+            var d = new myPropInfo();
             d.filled = true;
             d.CanWrite = true;
             d.pt = t;
-            d.Name = name;
             d.isGenericType = t.IsGenericType;
 
             d.isDictionary = t.IsGenericType && typeof (IDictionary).IsAssignableFrom(t);
@@ -374,14 +353,10 @@ namespace fastJSON
             if (d.isDictionary && d.GenericTypes.Length > 0 && d.GenericTypes[0] == typeof(string))
                 d.isStringDictionary = true;
 
-#if CUSTOMTYPE
-            if (IsTypeRegistered(t))
-                d.isCustomType = true;
-#endif
             return d;
         }
 
-        private object ChangeType(object value, Type conversionType, Dictionary<string, object> globaltypes)
+        private object ChangeType(object value, Type conversionType, Dictionary<string, object> globaltypes, bool usingglobals)
         {
             if (value.GetType() == conversionType) return value;
 
@@ -392,7 +367,7 @@ namespace fastJSON
                 return (long)value;
 
             if (conversionType == typeof(string))
-                return (string)value;
+                return value;
 
             if (conversionType == typeof(Guid))
                 return CreateGuid((string)value);
@@ -402,13 +377,13 @@ namespace fastJSON
 
             if (value is IList)
             {
-                if (_deserializers_list.ContainsKey(conversionType)) return _deserializers_list[conversionType](Listify(value), conversionType, (t, x) => ChangeType(DecodeParsed(t,globaltypes, x), t, globaltypes));
-                if (conversionType.IsGenericType && _deserializers_list.ContainsKey(conversionType.GetGenericTypeDefinition())) return _deserializers_list[conversionType.GetGenericTypeDefinition()](Listify(value), conversionType, (t, x) => ChangeType(DecodeParsed(t, globaltypes, x), t, globaltypes));
+                if (_deserializers_list.ContainsKey(conversionType)) return _deserializers_list[conversionType](Listify(value), conversionType, (t, x) => ChangeType(DecodeParsed(t,globaltypes, x,usingglobals), t, globaltypes,usingglobals));
+                if (conversionType.IsGenericType && _deserializers_list.ContainsKey(conversionType.GetGenericTypeDefinition())) return _deserializers_list[conversionType.GetGenericTypeDefinition()](Listify(value), conversionType, (t, x) => ChangeType(DecodeParsed(t, globaltypes, x,usingglobals), t, globaltypes,usingglobals));
             }
             else
             {
-                if (_deserializers_value.ContainsKey(conversionType)) return _deserializers_value[conversionType](value, conversionType, (t, x) => ChangeType(DecodeParsed(t,globaltypes, x), t, globaltypes));
-                if (conversionType.IsGenericType && _deserializers_value.ContainsKey(conversionType.GetGenericTypeDefinition())) return _deserializers_value[conversionType.GetGenericTypeDefinition()](value, conversionType, (t, x) => ChangeType(DecodeParsed(t, globaltypes, x), t, globaltypes));
+                if (_deserializers_value.ContainsKey(conversionType)) return _deserializers_value[conversionType](value, conversionType, (t, x) => ChangeType(DecodeParsed(t,globaltypes, x,usingglobals), t, globaltypes,usingglobals));
+                if (conversionType.IsGenericType && _deserializers_value.ContainsKey(conversionType.GetGenericTypeDefinition())) return _deserializers_value[conversionType.GetGenericTypeDefinition()](value, conversionType, (t, x) => ChangeType(DecodeParsed(t, globaltypes, x,usingglobals), t, globaltypes,usingglobals));
             }
 
             return Convert.ChangeType(value, conversionType, CultureInfo.InvariantCulture);
@@ -428,58 +403,56 @@ namespace fastJSON
 
         private object RootList(object parse, Type type, Dictionary<string, object> globaltypes)
         {
-            Type[] gtypes = type.GetGenericArguments();
-            IList o = (IList)Reflection.Instance.FastCreateInstance(type);
+            var gtypes = type.GetGenericArguments();
+            var o = (IList)_reflection.FastCreateInstance(type);
             foreach (var k in (IList)parse)
             {
-                _usingglobals = false;
-                object v = k;
+                object v;
                 if (k is Dictionary<string, object>)
-                    v = ParseDictionary(k as Dictionary<string, object>, globaltypes, gtypes[0], null);
+                    v = ParseDictionary(k as Dictionary<string, object>, globaltypes, gtypes[0], null, false);
                 else
-                    v = ChangeType(k, gtypes[0], globaltypes);
+                    v = ChangeType(k, gtypes[0], globaltypes,false);
 
                 o.Add(v);
             }
             return o;
         }
 
-        private object RootDictionary(object parse, Type type, Dictionary<string, object> globaltypes)
+        private object RootDictionary(object parse, Type type, Dictionary<string, object> globaltypes, bool usingglobals)
         {
-            Type[] gtypes = type.GetGenericArguments();
+            var gtypes = type.GetGenericArguments();
             if (parse is Dictionary<string, object>)
             {
-                IDictionary o = (IDictionary)Reflection.Instance.FastCreateInstance(type);
+                var o = (IDictionary)_reflection.FastCreateInstance(type);
 
                 foreach (var kv in (Dictionary<string, object>)parse)
                 {
                     object v;
-                    object k = ChangeType(kv.Key, gtypes[0], globaltypes);
+                    object k = ChangeType(kv.Key, gtypes[0], globaltypes, usingglobals);
                     if (kv.Value is Dictionary<string, object>)
-                        v = ParseDictionary(kv.Value as Dictionary<string, object>, globaltypes, gtypes[1], null);
+                        v = ParseDictionary(kv.Value as Dictionary<string, object>, globaltypes, gtypes[1], null, usingglobals);
                     else if (kv.Value is List<object>)
-                        v = CreateArray(kv.Value as List<object>, typeof(object), typeof(object), null);
+                        v = CreateArray(kv.Value as List<object>, typeof(object), typeof(object), null, usingglobals);
                     else
-                        v = ChangeType(kv.Value, gtypes[1], globaltypes);
+                        v = ChangeType(kv.Value, gtypes[1], globaltypes,usingglobals);
                     o.Add(k, v);
                 }
 
                 return o;
             }
             if (parse is List<object>)
-                return CreateDictionary(parse as List<object>, type, gtypes, null);
+                return CreateDictionary(parse as List<object>, type, gtypes, null, usingglobals);
 
             return null;
         }
 
-        bool _usingglobals = false;
-        private object ParseDictionary(Dictionary<string, object> d, Dictionary<string, object> globaltypes, Type type, object input)
+        private object ParseDictionary(Dictionary<string, object> d, Dictionary<string, object> globaltypes, Type type, object input, bool usingglobals)
         {
-            object tn = "";
+            object tn;
 
             if (globaltypes==null && d.TryGetValue("$types", out tn))
             {
-                _usingglobals = true;
+                usingglobals = true;
                 globaltypes = new Dictionary<string, object>();
                 foreach (var kv in (Dictionary<string, object>)tn)
                 {
@@ -491,18 +464,18 @@ namespace fastJSON
 #if !SILVERLIGHT
             if (found == false && type == typeof(System.Object))
             {
-                return CreateDataset(d, globaltypes);
+                return CreateDataset(d, globaltypes, usingglobals);
             }
 #endif
             if (found)
             {
-                if (_usingglobals && globaltypes!=null)
+                if (usingglobals && globaltypes!=null)
                 {
                     object tname = "";
                     if (globaltypes.TryGetValue((string)tn, out tname))
                         tn = tname;
                 }
-                type = Reflection.Instance.GetTypeFromCache((string)tn);
+                type = _reflection.GetTypeFromCache((string)tn);
             }
 
             if (type == null)
@@ -511,7 +484,7 @@ namespace fastJSON
             string typename = type.FullName;
             object o = input;
             if (o == null)
-                o = Reflection.Instance.FastCreateInstance(type);
+                o = _reflection.FastCreateInstance(type);
 
             SafeDictionary<string, myPropInfo> props = Getproperties(type, typename);
             foreach (string n in d.Keys)
@@ -539,10 +512,7 @@ namespace fastJSON
                         {
                             if (pi.isInt)
                                 oset = (int) ((long) v);
-#if CUSTOMTYPE
-                        else if (pi.isCustomType)
-                            oset = CreateCustom((string)v, pi.pt);
-#endif
+
                             else if (pi.isLong)
                                 oset = (long) v;
 
@@ -553,33 +523,34 @@ namespace fastJSON
                                 oset = (bool) v;
 
                             else if (pi.isGenericType && !pi.isValueType && pi.isList)
-                                oset = CreateGenericList((List<object>) v, pi.pt, pi.bt, globaltypes);
+                                oset = CreateGenericList((List<object>) v, pi.pt, pi.bt, globaltypes, usingglobals);
 
                             else if (pi.isByteArray)
                                 oset = Convert.FromBase64String((string) v);
 
                             else if (pi.isArray && pi.isValueType == false)
-                                oset = CreateArray((List<object>) v, pi.pt, pi.bt, globaltypes);
+                                oset = CreateArray((List<object>) v, pi.pt, pi.bt, globaltypes, usingglobals);
 
                             else if (pi.isGuid)
                                 oset = CreateGuid((string) v);
 #if !SILVERLIGHT
                             else if (pi.isDataSet)
-                                oset = CreateDataset((Dictionary<string, object>) v, globaltypes);
+                                oset = CreateDataset((Dictionary<string, object>) v, globaltypes, usingglobals);
 
                             else if (pi.isDataTable)
-                                oset = this.CreateDataTable((Dictionary<string, object>) v, globaltypes);
+                                oset = this.CreateDataTable((Dictionary<string, object>) v, globaltypes, usingglobals);
 #endif
 
                             else if (pi.isStringDictionary)
                                 oset = CreateStringKeyDictionary((Dictionary<string, object>) v, pi.pt, pi.GenericTypes,
-                                    globaltypes);
+                                    globaltypes, usingglobals
+                                    );
 #if !SILVERLIGHT
                             else if (pi.isDictionary || pi.isHashtable)
 #else
                         else if (pi.isDictionary)
 #endif
-                                oset = CreateDictionary((List<object>) v, pi.pt, pi.GenericTypes, globaltypes);
+                                oset = CreateDictionary((List<object>) v, pi.pt, pi.GenericTypes, globaltypes, usingglobals);
 
                             else if (pi.isEnum)
                                 oset = CreateEnum(pi.pt, (string) v);
@@ -589,13 +560,13 @@ namespace fastJSON
 
                             else if ((pi.isClass || pi.isInterface || pi.isValueType) && v is Dictionary<string, object>)
                                 oset = ParseDictionary((Dictionary<string, object>) v, globaltypes, pi.pt,
-                                    pi.getter(o));
+                                    pi.getter(o),usingglobals);
 
                             else if (pi.isValueType)
-                                oset = ChangeType(v, pi.changeType, globaltypes);
+                                oset = ChangeType(v, pi.changeType, globaltypes,usingglobals);
 
                             else if (v is List<object>)
-                                oset = CreateArray((List<object>) v, pi.pt, typeof (object), globaltypes);
+                                oset = CreateArray((List<object>) v, pi.pt, typeof (object), globaltypes, usingglobals);
 
                             else
                                 oset = v;
@@ -611,15 +582,6 @@ namespace fastJSON
             }
             return o;
         }
-
-#if CUSTOMTYPE
-        private object CreateCustom(string v, Type type)
-        {
-            Deserialize d;
-            _customDeserializer.TryGetValue(type, out d);
-            return d(v);
-        }
-#endif
 
         private void ProcessMap(object obj, SafeDictionary<string, JSON.myPropInfo> props, Dictionary<string, object> dic)
         {
@@ -692,7 +654,7 @@ namespace fastJSON
                 return new DateTime(year, month, day, hour, min, sec, DateTimeKind.Utc);
         }
 
-        private object CreateArray(List<object> data, Type pt, Type bt, Dictionary<string, object> globalTypes)
+        private object CreateArray(List<object> data, Type pt, Type bt, Dictionary<string, object> globalTypes, bool usingglobals)
         {
             Array col = Array.CreateInstance(bt, data.Count);
             // create an array of objects
@@ -700,36 +662,36 @@ namespace fastJSON
             {
                 object ob = data[i];
                 if (ob is IDictionary)
-                    col.SetValue(ParseDictionary((Dictionary<string, object>)ob, globalTypes, bt, null), i);
+                    col.SetValue(ParseDictionary((Dictionary<string, object>)ob, globalTypes, bt, null,usingglobals), i);
                 else
-                    col.SetValue(ChangeType(ob, bt, globalTypes), i);
+                    col.SetValue(ChangeType(ob, bt, globalTypes,usingglobals), i);
             }
 
             return col;
         }
 
 
-        private object CreateGenericList(List<object> data, Type pt, Type bt, Dictionary<string, object> globalTypes)
+        private object CreateGenericList(List<object> data, Type pt, Type bt, Dictionary<string, object> globalTypes, bool usingglobals)
         {
-            IList col = (IList)Reflection.Instance.FastCreateInstance(pt);
+            IList col = (IList)_reflection.FastCreateInstance(pt);
             // create an array of objects
             foreach (object ob in data)
             {
                 if (ob is IDictionary)
-                    col.Add(ParseDictionary((Dictionary<string, object>)ob, globalTypes, bt, null));
+                    col.Add(ParseDictionary((Dictionary<string, object>)ob, globalTypes, bt, null,usingglobals));
 
                 else if (ob is List<object>)
                     col.Add(((List<object>)ob).ToArray());
 
                 else
-                    col.Add(ChangeType(ob, bt, globalTypes));
+                    col.Add(ChangeType(ob, bt, globalTypes, usingglobals));
             }
             return col;
         }
 
-        private object CreateStringKeyDictionary(Dictionary<string, object> reader, Type pt, Type[] types, Dictionary<string, object> globalTypes)
+        private object CreateStringKeyDictionary(Dictionary<string, object> reader, Type pt, Type[] types, Dictionary<string, object> globalTypes, bool usingglobals)
         {
-            var col = (IDictionary)Reflection.Instance.FastCreateInstance(pt);
+            var col = (IDictionary)_reflection.FastCreateInstance(pt);
             Type t1 = null;
             Type t2 = null;
             if (types != null)
@@ -743,18 +705,18 @@ namespace fastJSON
                 var key = values.Key;//ChangeType(values.Key, t1);
                 object val = null;
                 if (values.Value is Dictionary<string, object>)
-                    val = ParseDictionary((Dictionary<string, object>)values.Value, globalTypes, t2, null);
+                    val = ParseDictionary((Dictionary<string, object>)values.Value, globalTypes, t2, null, usingglobals);
                 else
-                    val = ChangeType(values.Value, t2, globalTypes);
+                    val = ChangeType(values.Value, t2, globalTypes,usingglobals);
                 col.Add(key, val);
             }
 
             return col;
         }
 
-        private object CreateDictionary(List<object> reader, Type pt, Type[] types, Dictionary<string, object> globalTypes)
+        private object CreateDictionary(List<object> reader, Type pt, Type[] types, Dictionary<string, object> globalTypes, bool usingglobals)
         {
-            IDictionary col = (IDictionary)Reflection.Instance.FastCreateInstance(pt);
+            IDictionary col = (IDictionary)_reflection.FastCreateInstance(pt);
             Type t1 = null;
             Type t2 = null;
             if (types != null)
@@ -769,14 +731,14 @@ namespace fastJSON
                 object val = values["v"];
 
                 if (key is Dictionary<string, object>)
-                    key = ParseDictionary((Dictionary<string, object>)key, globalTypes, t1, null);
+                    key = ParseDictionary((Dictionary<string, object>)key, globalTypes, t1, null,usingglobals);
                 else
-                    key = ChangeType(key, t1, globalTypes);
+                    key = ChangeType(key, t1, globalTypes, usingglobals);
 
                 if (val is Dictionary<string, object>)
-                    val = ParseDictionary((Dictionary<string, object>)val, globalTypes, t2, null);
+                    val = ParseDictionary((Dictionary<string, object>)val, globalTypes, t2, null,usingglobals);
                 else
-                    val = ChangeType(val, t2, globalTypes);
+                    val = ChangeType(val, t2, globalTypes, usingglobals);
 
                 col.Add(key, val);
             }
@@ -792,14 +754,14 @@ namespace fastJSON
             return conversionType;
         }
 #if !SILVERLIGHT
-        private DataSet CreateDataset(Dictionary<string, object> reader, Dictionary<string, object> globalTypes)
+        private DataSet CreateDataset(Dictionary<string, object> reader, Dictionary<string, object> globalTypes, bool usingglobals)
         {
             DataSet ds = new DataSet();
             ds.EnforceConstraints = false;
             ds.BeginInit();
 
             // read dataset schema here
-            ReadSchema(reader, ds, globalTypes);
+            ReadSchema(reader, ds, globalTypes, usingglobals);
 
             foreach (KeyValuePair<string, object> pair in reader)
             {
@@ -817,7 +779,7 @@ namespace fastJSON
             return ds;
         }
 
-        private void ReadSchema(Dictionary<string, object> reader, DataSet ds, Dictionary<string, object> globalTypes)
+        private void ReadSchema(Dictionary<string, object> reader, DataSet ds, Dictionary<string, object> globalTypes, bool usingglobals)
         {
             var schema = reader["$schema"];
 
@@ -828,7 +790,7 @@ namespace fastJSON
             }
             else
             {
-                DatasetSchema ms = (DatasetSchema)ParseDictionary((Dictionary<string, object>)schema, globalTypes, typeof(DatasetSchema), null);
+                var ms = (DatasetSchema)ParseDictionary((Dictionary<string, object>)schema, globalTypes, typeof(DatasetSchema), null, usingglobals);
                 ds.DataSetName = ms.Name;
                 for (int i = 0; i < ms.Info.Count; i += 3)
                 {
@@ -880,7 +842,7 @@ namespace fastJSON
             dt.EndInit();
         }
 
-        DataTable CreateDataTable(Dictionary<string, object> reader, Dictionary<string, object> globalTypes)
+        DataTable CreateDataTable(Dictionary<string, object> reader, Dictionary<string, object> globalTypes, bool usingglobals)
         {
             var dt = new DataTable();
 
@@ -894,7 +856,7 @@ namespace fastJSON
             }
             else
             {
-                var ms = (DatasetSchema)this.ParseDictionary((Dictionary<string, object>)schema, globalTypes, typeof(DatasetSchema), null);
+                var ms = (DatasetSchema)this.ParseDictionary((Dictionary<string, object>)schema, globalTypes, typeof(DatasetSchema), null, usingglobals);
                 dt.TableName = ms.Info[0];
                 for (int i = 0; i < ms.Info.Count; i += 3)
                 {
@@ -923,10 +885,10 @@ namespace fastJSON
         #endregion
 
 
-        private static readonly Dictionary<Type, CustomSerialization> _serializers = new Dictionary<Type, CustomSerialization>();
-        private static readonly Dictionary<Type, CustomDeserialization_dict> _deserializers_dict = new Dictionary<Type, CustomDeserialization_dict>();
-        private static readonly Dictionary<Type, CustomDeserialization_list> _deserializers_list = new Dictionary<Type, CustomDeserialization_list>();
-        private static readonly Dictionary<Type, CustomDeserialization_value> _deserializers_value = new Dictionary<Type, CustomDeserialization_value>();
+        private readonly Dictionary<Type, CustomSerialization> _serializers = new Dictionary<Type, CustomSerialization>();
+        private readonly Dictionary<Type, CustomDeserialization_dict> _deserializers_dict = new Dictionary<Type, CustomDeserialization_dict>();
+        private readonly Dictionary<Type, CustomDeserialization_list> _deserializers_list = new Dictionary<Type, CustomDeserialization_list>();
+        private readonly Dictionary<Type, CustomDeserialization_value> _deserializers_value = new Dictionary<Type, CustomDeserialization_value>();
 
         public void RegisterCustomSerializer(Type type, CustomSerialization serialize)
         {
@@ -980,5 +942,7 @@ namespace fastJSON
             _deserializers_value.Clear();
         }
     }
+
+    
 
 }
