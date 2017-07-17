@@ -550,7 +550,10 @@ namespace fastJSON
             if (_isObject.HasValue && _isObject.Value) throw new InvalidOperationException("FASTJSON/CUSTOM ERROR 00C");
             _isObject = false;
             _actions.Enqueue(() => _sb.Append('['));
-            foreach (var item in items) _actions.Enqueue(item.Payload);
+            foreach (var item in items) {
+                _actions.Enqueue(item.Payload);
+                _actions.Enqueue(() => _sb.Append(','));
+            }
             _actions.Enqueue(() => _sb.Append(']'));
         }
 
