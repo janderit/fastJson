@@ -268,7 +268,7 @@ namespace fastJSON
 
         bool _TypesWritten;
 
-        
+
 
         private void WriteObject(object obj)
         {
@@ -288,7 +288,7 @@ namespace fastJSON
                 custom(obj, target, target.Defer);
                 target.WriteToTarget();
             }
-            else { 
+            else {
 
                 if (_params.UsingGlobalTypes == false)
                     _output.Append('{');
@@ -549,10 +549,12 @@ namespace fastJSON
         {
             if (_isObject.HasValue && _isObject.Value) throw new InvalidOperationException("FASTJSON/CUSTOM ERROR 00C");
             _isObject = false;
+            var pendingSeperator = false;
             _actions.Enqueue(() => _sb.Append('['));
             foreach (var item in items) {
+                if (pendingSeperator) _actions.Enqueue(() => _sb.Append(','));
                 _actions.Enqueue(item.Payload);
-                _actions.Enqueue(() => _sb.Append(','));
+                pendingSeperator = true;
             }
             _actions.Enqueue(() => _sb.Append(']'));
         }
