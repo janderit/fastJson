@@ -22,7 +22,7 @@ TARGET = :Debug
 
 NOTES = BRANCH
 
-NUNIT_EXE="C:/Program Files (x86)/NUnit 2.6/bin/nunit-console" if File.exists?("C:/Program Files (x86)/NUnit 2.6/bin/nunit-console.exe")
+NUNIT_EXE="C:/Program Files (x86)/NUnit 2.6.3/bin/nunit-console" if File.exists?("C:/Program Files (x86)/NUnit 2.6.3/bin/nunit-console.exe")
 NUNIT_EXE="C:/Program Files (x86)/NUnit 2.6.1/bin/nunit-console" if File.exists?("C:/Program Files (x86)/NUnit 2.6.1/bin/nunit-console.exe")
 NUNIT_EXE="C:/Programme/NUnit 2.6.1/bin/nunit-console" if File.exists?("C:/Programme/NUnit 2.6.1/bin/nunit-console.exe")
 NUNIT_ARGS=" /labels"

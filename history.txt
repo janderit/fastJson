@@ -146,3 +146,12 @@
 2.0.5
 - fixed number parsing for invariant format 
 - added a test for German locale number testing (,. problems)
+
+2.1.0
+- todo
+
+3.0.0
+- bumped major version to denote (previous) breaking changes
+
+3.0.1 
+- bug in CustomSerialization/WriteList fixed that led to missing commas
